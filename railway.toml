@@ -3,7 +3,3 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "python main.py"
-
-[[services]]
-name = "food-bot"
-type = "worker"
