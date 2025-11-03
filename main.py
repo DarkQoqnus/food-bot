@@ -41,5 +41,4 @@ async def main():
     print("در حال مانیتورینگ...")
     await client.run_until_disconnected()
 
-if name == '__main__':
-    asyncio.run(main())
+asyncio.run(main())
