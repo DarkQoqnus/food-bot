@@ -84,5 +84,5 @@ async def main():
     print("✅ ربات شروع به کار کرد و در حال مانیتورینگ...")
     await client.run_until_disconnected()
 
-if name == 'main':
+if __name__ == '__main__':
     asyncio.run(main())
