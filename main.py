@@ -1,29 +1,34 @@
 import asyncio
-from bot_manager import start_manager
-from food_scraper import start_scraper
 import threading
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from handlers.command_handler import start_command
+from handlers.button_handler import handle_button
+from modules.scraper_manager import start_scraper
+from config import BOT_TOKEN
 
 def run_bot_manager():
-    """اجرای ربات مدیریت در thread جداگانه"""
-    start_manager()
+    """اجرای ربات مدیریت"""
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("panel", start_command))
+    app.add_handler(CallbackQueryHandler(handle_button))
+    
+    print("🤖 ربات مدیریت فعال شد...")
+    app.run_polling()
 
 def run_food_scraper():
     """اجرای اسکریپت اصلی"""
     asyncio.run(start_scraper())
 
-if __name__ == '__main__':
+def main():
     print("🚀 در حال راه‌اندازی سیستم...")
     
-    # اول ربات مدیریت رو در thread جداگانه اجرا کن
+    # اجرای ربات مدیریت در thread جداگانه
     manager_thread = threading.Thread(target=run_bot_manager, daemon=True)
     manager_thread.start()
     
-    print("🤖 ربات مدیریت در حال راه‌اندازی...")
-    
-    # سپس اسکریپت اصلی رو اجرا کن
-    try:
-        run_food_scraper()
-    except KeyboardInterrupt:
-        print("⏹️ سیستم متوقف شد")
-    except Exception as e:
-        print(f"❌ خطا در اجرای اسکریپت اصلی: {e}")
+    # اجرای اسکریپت اصلی
+    run_food_scraper()
+
+if __name__ == '__main__':
+    main()
