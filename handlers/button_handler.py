@@ -6,32 +6,53 @@ from modules.account_manager import create_accounts_keyboard, get_accounts_text
 from modules.status_manager import get_status_text
 
 async def handle_button(update: Update, context: CallbackContext):
+    """هندلر کلیه دکمه‌های اینلاین"""
     global bot_status, current_filter
     query = update.callback_query
     
+    # چک دسترسی
     if query.from_user.id != YOUR_USER_ID:
         await query.answer("❌ دسترسی denied")
-        return
+        return  # return بدون مقدار
     
     data = query.data
     
+    # پاسخ به کلیک دکمه
+    await query.answer()
+    
     if data == "power_on":
         bot_status = "on"
-        await query.answer("🟢 روشن شد")
+        # پیام تایید نمایش داده میشه ولی چیزی return نمیشه
     elif data == "power_off":
-        bot_status = "off" 
-        await query.answer("🔴 خاموش شد")
+        bot_status = "off"
     elif data.startswith("filter_"):
         current_filter = data.split("_")[1]
-        await query.answer(f"فیلتر: {current_filter}")
     elif data == "system_status":
-        await query.edit_message_text(get_status_text(), reply_markup=create_back_button(), parse_mode='HTML')
-        return
+        await query.edit_message_text(
+            get_status_text(), 
+            reply_markup=create_back_button(), 
+            parse_mode='HTML'
+        )
+        return  # return زودهنگام
     elif data == "manage_accounts":
-        await query.edit_message_text(get_accounts_text(), reply_markup=create_accounts_keyboard(), parse_mode='HTML')
-        return
+        await query.edit_message_text(
+            get_accounts_text(),
+            reply_markup=create_accounts_keyboard(),
+            parse_mode='HTML'
+        )
+        return  # return زودهنگام
     elif data == "back_to_panel":
-        await query.edit_message_text(get_panel_text(), reply_markup=create_main_panel(), parse_mode='HTML')
-        return
+        await query.edit_message_text(
+            get_panel_text(),
+            reply_markup=create_main_panel(),
+            parse_mode='HTML'
+        )
+        return  # return زودهنگام
     
-    await query.edit_message_text(get_panel_text(), reply_markup=create_main_panel(), parse_mode='HTML')
+    # آپدیت پنل اصلی
+    await query.edit_message_text(
+        get_panel_text(),
+        reply_markup=create_main_panel(),
+        parse_mode='HTML'
+    )
+    # اینجا هم چیزی return نمیشه
