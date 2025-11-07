@@ -68,10 +68,10 @@ def create_accounts_keyboard():
     keyboard = []
     
     for i, account in enumerate(ACCOUNTS, 1):
-        status = "🟢" if account['active'] else "🔴"  # این خط
-        button_text = f"{i}_{account['name']}: {'فعال' if account['active'] else 'غیرفعال'}"  # این خط
-        callback_data = f"account_{i}"  # این خط
-        keyboard.append([InlineKeyboardButton(f"{status} {button_text}", callback_data=callback_data)])  # این خط
+        status = "🟢" if account['active'] else "🔴"
+        button_text = f"{i}_{account['name']}: {'فعال' if account['active'] else 'غیرفعال'}"
+        callback_data = f"account_{i}"
+        keyboard.append([InlineKeyboardButton(f"{status} {button_text}", callback_data=callback_data)])
     
     keyboard.append([InlineKeyboardButton("➕ افزودن اکانت جدید", callback_data="add_account")])
     keyboard.append([InlineKeyboardButton("🔙 بازگشت به پنل", callback_data="back_to_panel")])
@@ -328,5 +328,5 @@ app.add_handler(CommandHandler("panel", start_command))
     except Exception as e:
         print(f"خطا در شروع ربات مدیریت: {e}")
 
-if name == 'main':
+if __name__ == '__main__':
     start_manager()
