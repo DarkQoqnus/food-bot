@@ -11,7 +11,7 @@ def run_food_scraper():
     """اجرای اسکریپت اصلی"""
     asyncio.run(start_scraper())
 
-if name == 'main':
+if __name__ == '__main__':
     print("🚀 در حال راه‌اندازی سیستم...")
     
     # اول ربات مدیریت رو در thread جداگانه اجرا کن
