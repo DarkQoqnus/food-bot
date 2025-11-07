@@ -1,3 +1,4 @@
 telethon==1.28.5
 python-telegram-bot==20.7
 requests==2.31.0
+pstutil==5.9.6
