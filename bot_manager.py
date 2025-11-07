@@ -19,5 +19,5 @@ def start_manager():
     print("ربات مدیریت راه‌اندازی شد...")
     application.run_polling()
 
-if name == 'main':
+if __name__ == '__main__':
     start_manager()
