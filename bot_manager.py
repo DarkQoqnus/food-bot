@@ -42,7 +42,12 @@ def create_panel():
          InlineKeyboardButton("🏬 فیلتر: حافظ", callback_data="filter_حافظ"),
          InlineKeyboardButton("🔍 فیلتر: همه", callback_data="filter_همه")],
         [InlineKeyboardButton("🔄 وضعیت سیستم", callback_data="system_status")]
-        # دکمه آمار حذف شد
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def create_back_button():
+    keyboard = [
+        [InlineKeyboardButton("🔙 بازگشت به پنل", callback_data="back_to_panel")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -93,7 +98,11 @@ async def system_status_handler(update: Update, context: CallbackContext):
         f"└ آخرین بروزرسانی: {datetime.now().strftime('%H:%M:%S')}"
     )
     
-    await query.edit_message_text(status_text, parse_mode='HTML')
+    await query.edit_message_text(
+        status_text, 
+        reply_markup=create_back_button(),
+        parse_mode='HTML'
+    )
 
 async def button_handler(update: Update, context: CallbackContext):
     global bot_status, current_filter
@@ -106,13 +115,14 @@ async def button_handler(update: Update, context: CallbackContext):
     data = query.data
     
     if data == "power_on":
-        bot_status = "on"
+
+bot_status = "on"
         await query.answer("ربات روشن شد")
         await query.edit_message_text(
             get_panel_text(),
             reply_markup=create_panel(),
             parse_mode='HTML'
-)
+        )
     elif data == "power_off":
         bot_status = "off"
         await query.answer("ربات خاموش شد")
@@ -131,6 +141,12 @@ async def button_handler(update: Update, context: CallbackContext):
         )
     elif data == "system_status":
         await system_status_handler(update, context)
+    elif data == "back_to_panel":
+        await query.edit_message_text(
+            get_panel_text(),
+            reply_markup=create_panel(),
+            parse_mode='HTML'
+        )
 
 def start_manager():
     # ایجاد event loop جدید برای این thread
@@ -147,5 +163,5 @@ def start_manager():
     # اجرای برنامه با event loop جدید
     app.run_polling()
 
-if __name__ == '__main__':
+if name == 'main':
     start_manager()
