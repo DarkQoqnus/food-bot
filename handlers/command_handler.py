@@ -18,6 +18,3 @@ async def start_command(update: Update, context: CallbackContext):
         parse_mode='HTML'
     )
     # اینجا هم چیزی return نمیشه
-
-
-pass
