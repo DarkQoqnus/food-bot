@@ -42,6 +42,10 @@ async def message_handler(event):
             username = f"@{sender.username}" if sender.username else "بدون آیدی"
             user_id = sender.id
             
+            # گرفتن اطلاعات اکانت فعلی
+            me = await client.get_me()
+            account_name = f"@{me.username}" if me.username else f"{me.first_name} (اکانت اصلی)"
+            
             success = await send_quick_message(
                 sender.id, 
                 "سلام! غذا رو میخرم. لطفا قیمت و جزئیات رو بفرستید. ممنون"
@@ -50,19 +54,28 @@ async def message_handler(event):
             if success:
                 message_stats["success"] += 1
                 await send_report(
-                    f"✅ پیام ارسال شد به:\n"
-                    f"👤 نام: {sender.first_name or 'ناشناس'}\n"
-                    f"🆔 آیدی: {username}\n"
-                    f"💬 پیام: {message_text[:50]}..."
+                    f"✅ پیام ارسال شد\n"
+                    f"👤 به فروشنده: {sender.first_name or 'ناشناس'}\n"
+                    f"🆔 آیدی فروشنده: {username}\n"
+                    f"🤖 از اکانت: {account_name}\n"
+                    f"💬 پیام فروشنده: {message_text[:50]}...\n"
+                    f"⏰ زمان: {datetime.now().strftime('%H:%M:%S')}"
                 )
             else:
-                await send_report(f"❌ خطا در ارسال به {username}")
+                await send_report(
+                    f"❌ خطا در ارسال پیام\n"
+                    f"👤 به فروشنده: {sender.first_name}\n"
+                    f"🤖 از اکانت: {account_name}\n"
+                    f"🆔 آیدی: {username}"
+                )
             
     except Exception as e:
         print(f"خطا: {e}")
 
 async def start_scraper():
     await client.start()
-    await send_report("🤖 ربات غذا فعال شد - از /panel استفاده کن")
+    me = await client.get_me()
+    account_name = f"@{me.username}" if me.username else f"{me.first_name}"
+    await send_report(f"🤖 ربات غذا فعال شد\n\n🆔 اکانت فعال: {account_name}\n📞 شماره: {me.phone}\n\nبرای مدیریت از /panel استفاده کن")
     print("✅ اسکریپت اصلی فعال شد")
     await client.run_until_disconnected()
