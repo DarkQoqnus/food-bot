@@ -1,29 +1,29 @@
-import multiprocessing
 import asyncio
 from bot_manager import start_manager
 from food_scraper import start_scraper
+import threading
 
 def run_bot_manager():
-    """اجرای ربات مدیریت در process جداگانه"""
+    """اجرای ربات مدیریت در thread جداگانه"""
     start_manager()
 
 def run_food_scraper():
-    """اجرای اسکریپت اصلی در process جداگانه"""
+    """اجرای اسکریپت اصلی"""
     asyncio.run(start_scraper())
 
-if __name__ == '__main__':
+if name == 'main':
     print("🚀 در حال راه‌اندازی سیستم...")
     
-    # ایجاد process ها
-    manager_process = multiprocessing.Process(target=run_bot_manager)
-    scraper_process = multiprocessing.Process(target=run_food_scraper)
+    # اول ربات مدیریت رو در thread جداگانه اجرا کن
+    manager_thread = threading.Thread(target=run_bot_manager, daemon=True)
+    manager_thread.start()
     
-    # اجرای process ها
-    manager_process.start()
-    scraper_process.start()
+    print("🤖 ربات مدیریت در حال راه‌اندازی...")
     
-    print("✅ Process ها اجرا شدند")
-    
-    # منتظر ماندن تا process ها تمام شوند
-    manager_process.join()
-    scraper_process.join()
+    # سپس اسکریپت اصلی رو اجرا کن
+    try:
+        run_food_scraper()
+    except KeyboardInterrupt:
+        print("⏹️ سیستم متوقف شد")
+    except Exception as e:
+        print(f"❌ خطا در اجرای اسکریپت اصلی: {e}")
