@@ -214,6 +214,7 @@ async def button_handler(update: Update, context: CallbackContext):
             get_panel_text(),
             reply_markup=create_panel(),
             parse_mode='HTML'
+        )
 
     elif data == "manage_accounts":
         await manage_accounts_handler(update, context)
@@ -224,11 +225,13 @@ async def button_handler(update: Update, context: CallbackContext):
         ACCOUNTS[account_index]['active'] = True
         await query.answer("✅ اکانت فعال شد")
         await manage_accounts_handler(update, context)
+        )
     elif data.startswith("disable_"):
         account_index = int(data.split("_")[1]) - 1
         ACCOUNTS[account_index]['active'] = False
         await query.answer("🔴 اکانت غیرفعال شد")
         await manage_accounts_handler(update, context)
+        )
     elif data == "add_account":
         # کد افزودن اکانت جدید
         await add_account_handler(update, context)
