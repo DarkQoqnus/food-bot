@@ -53,7 +53,6 @@ async def message_handler(event):
                     f"✅ پیام ارسال شد به:\n"
                     f"👤 نام: {sender.first_name or 'ناشناس'}\n"
                     f"🆔 آیدی: {username}\n"
-                    f"🔢 عددی: {user_id}\n"
                     f"💬 پیام: {message_text[:50]}..."
                 )
             else:
