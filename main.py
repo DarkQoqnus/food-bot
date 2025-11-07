@@ -6,10 +6,10 @@ import requests
 
 # تنظیمات
 API_ID = int(os.environ['API_ID'])
-API_HASH = os.environ['API_HASH'])
-BOT_TOKEN = os.environ['BOT_TOKEN'])
+API_HASH = os.environ['API_HASH']
+BOT_TOKEN = os.environ['BOT_TOKEN']
 YOUR_USER_ID = int(os.environ['YOUR_USER_ID'])
-SESSION_STRING = os.environ['SESSION_STRING'])
+SESSION_STRING = os.environ['SESSION_STRING']
 GROUP_ID = int(os.environ['GROUP_ID'])
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
@@ -57,5 +57,5 @@ async def main():
     print("⚡ ربات فوق‌سریع فعال شد!")
     await client.run_until_disconnected()
 
-if name == 'main':
+if __name__ == '__main__':
     asyncio.run(main())
