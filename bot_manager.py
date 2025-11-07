@@ -1,4 +1,3 @@
-import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
 from datetime import datetime
@@ -65,18 +64,12 @@ async def button_handler(update: Update, context: CallbackContext):
     )
 
 def start_manager():
-    # ایجاد event loop جدید برای این thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("panel", start_command))
     app.add_handler(CallbackQueryHandler(button_handler))
     
     print("🤖 پنل مدیریت فعال شد...")
-    
-    # اجرای برنامه با event loop جدید
     app.run_polling()
 
 if __name__ == '__main__':
