@@ -116,7 +116,7 @@ async def button_handler(update: Update, context: CallbackContext):
     
     if data == "power_on":
 
-bot_status = "on"
+        bot_status = "on"
         await query.answer("ربات روشن شد")
         await query.edit_message_text(
             get_panel_text(),
