@@ -1,14 +1,15 @@
 import asyncio
 import threading
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
-from handlers.command_handler import start_command
-from handlers.button_handler import handle_button
-from modules.scraper_manager import start_scraper
+from handlers import start_command, handle_button
+from modules import start_scraper
 from config import BOT_TOKEN
 
 def run_bot_manager():
     """اجرای ربات مدیریت"""
     app = Application.builder().token(BOT_TOKEN).build()
+    
+    # ثبت هندلرها
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("panel", start_command))
     app.add_handler(CallbackQueryHandler(handle_button))
@@ -27,8 +28,15 @@ def main():
     manager_thread = threading.Thread(target=run_bot_manager, daemon=True)
     manager_thread.start()
     
+    print("✅ ربات مدیریت راه‌اندازی شد")
+    
     # اجرای اسکریپت اصلی
-    run_food_scraper()
+    try:
+        run_food_scraper()
+    except KeyboardInterrupt:
+        print("⏹️ سیستم متوقف شد")
+    except Exception as e:
+        print(f"❌ خطا در اجرای اسکریپت اصلی: {e}")
 
 if __name__ == '__main__':
     main()
