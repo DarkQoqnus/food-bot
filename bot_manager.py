@@ -102,12 +102,12 @@ def get_accounts_text():
     
     for i, account in enumerate(ACCOUNTS, 1):
 
-status_icon = "🟢" if account['active'] else "🔴"
+        status_icon = "🟢" if account['active'] else "🔴"
         status_text = "فعال" if account['active'] else "غیرفعال"
         text += f"{status_icon} {i}. {account['name']} - {status_text}\n"
     
-    text += f"\n⏰ آخرین بروزرسانی: {datetime.now().strftime('%H:%M:%S')}"
-    return text
+        text += f"\n⏰ آخرین بروزرسانی: {datetime.now().strftime('%H:%M:%S')}"
+        return text
 
 async def start_command(update: Update, context: CallbackContext):
     """دستور شروع /start"""
@@ -209,7 +209,7 @@ async def add_account_handler(update: Update, context: CallbackContext):
         f"➕ افزودن اکانت جدید\n\n"
         f"📝 برای افزودن اکانت جدید، لطفاً session string رو وارد کنید:\n\n"
 
-f"فرمت:\n"
+        f"فرمت:\n"
         f"SESSION_STRING\n\n"
         f"📍 مثال:\n"
         f"1AQBz5bcdefghijklmnopqrstuvwxyz...\n\n"
@@ -317,7 +317,7 @@ def start_manager():
         app = Application.builder().token(BOT_TOKEN).build()
         app.add_handler(CommandHandler("start", start_command))
 
-app.add_handler(CommandHandler("panel", start_command))
+        app.add_handler(CommandHandler("panel", start_command))
         app.add_handler(CallbackQueryHandler(button_handler))
         
         print("🤖 پنل مدیریت فعال شد...")
