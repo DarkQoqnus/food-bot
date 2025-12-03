@@ -19,8 +19,8 @@ ADMIN_ID = int(os.environ["ADMIN_ID"])
 
 # ===== STATE =====
 state = {
-    "active": True,
-    "filter_words": ["سلف"],  # فقط یک فیلتر فعال
+    "active": False,       # شروع خاموش
+    "filter_words": [""],  # بدون فیلتر اولیه
 }
 contacted_sellers, seller_last_dm_at = set(), {}
 COOLDOWN_SECONDS, GLOBAL_RATE_SECONDS = 60, 5
@@ -50,7 +50,7 @@ def toggle(update, ctx):
 def setfilter(update, ctx):
     if not is_admin(update): return
     if ctx.args:
-        state["filter_words"] = [ctx.args[0]]  # فقط اولین کلمه
+        state["filter_words"] = [ctx.args[0]]
         update.message.reply_text(f"فیلتر مورد نظر تنظیم شد: {state['filter_words'][0]}")
     else:
         update.message.reply_text("یک کلمه بده: /setfilter سلف")
@@ -58,7 +58,7 @@ def setfilter(update, ctx):
 def status(update, ctx):
     if not is_admin(update): return
     status_text = "روشن ✅" if state["active"] else "خاموش ❌"
-    current_filter = state["filter_words"][0] if state["filter_words"] else "-"
+    current_filter = state["filter_words"][0] if state["filter_words"] and state["filter_words"][0] else "-"
     contacted_count = len(contacted_sellers)
     update.message.reply_text(
         f"📊 وضعیت ربات:\n"
@@ -101,14 +101,15 @@ async def safe_send(text):
         logging.error(f"Report error: {e}")
 
 def normalize_text(t): 
-    t = (t or "").replace('\u200c', ' ').strip()
+    t = (t or "").replace('\u200c', ' ').strip()  # نیم‌فاصله → فاصله
     t = re.sub(r'\s+', ' ', t)
     t = t.replace('ي','ی').replace('ك','ک')
     return t
 
 def match_sale(text, filters):
     t = normalize_text(text)
-    has_sale = re.search(r'(فروشی|می\s*فروشم)', t)
+    # regex شامل نیم‌فاصله هم هست
+    has_sale = re.search(r'(فروشی|می[\s\u200c]*فروشم)', t)
     filters_regex = r'(' + '|'.join(map(re.escape, filters)) + r')'
     has_filter = re.search(filters_regex, t)
     return bool(has_sale and has_filter)
@@ -140,7 +141,7 @@ async def sender_loop():
 @client.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
     if not state["active"]: return
-    text = normalize_text(event.message.message or "")
+    text = event.message.message or ""
     if not text: return
     sender_id = event.sender_id
     if sender_id == ADMIN_ID: return
@@ -166,11 +167,12 @@ async def private_replies(event):
     except Exception:
         return
     if user_id in contacted_sellers:
-        msg = normalize_text(event.message.message or "")
+        msg = event.message.message or ""  # متن کامل بدون تغییر
         if msg:
             await asyncio.sleep(1)
             seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            await safe_send(f"📩 جواب از {seller_name}: {msg}")
+            # خط فاصله بعد از اسم فروشنده
+            await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
 
 def run_bot(): updater.start_polling()
 async def run():
