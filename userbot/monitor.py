@@ -13,11 +13,10 @@ class FoodMonitor:
         self.client = None
         self.is_monitoring = False
         self.current_filter = "سلف"
-        self.bad_words = []
         self.found_items = []
         self.sent_messages = {}
         self.start_time = datetime.now()
-        self.bot_user_id = None  # آی‌دی عددی خود ربات
+        self.bot_user_id = None
     
     async def start(self):
         """شروع یوزربات"""
@@ -35,125 +34,153 @@ class FoodMonitor:
                 logger.error("کاربر تأیید نشده!")
                 return
             
-            # دریافت اطلاعات اکانت
             me = await self.client.get_me()
-            self.bot_user_id = me.id  # ذخیره آی‌دی ربات
-            logger.info(f"✅ UserBot شروع به کار کرد: {me.first_name} (آی‌دی: {me.id})")
+            self.bot_user_id = me.id
+            logger.info(f"✅ UserBot شروع به کار کرد: {me.first_name} (@{me.username})")
             
-            # فقط یک پیام تست به مدیر
-            try:
-                await self.client.send_message(
-                    Config.ADMIN_USER_ID,
-                    "✅ ربات فعال شد. دستور 'وضعیت' را بفرستید."
-                )
-            except:
-                pass  # مهم نیست اگر نرسید
+            # **مهم: به خودت پیام نده! فقط لاگ کن**
+            logger.info(f"📱 اکانت: @{me.username} | آی‌دی: {me.id}")
+            logger.info(f"👤 مدیر: {Config.ADMIN_USER_ID}")
+            logger.info(f"🎯 گروه: {Config.TARGET_GROUP_ID}")
             
             # تنظیم هندلرها
             self.setup_handlers()
             
-            logger.info("📡 در حال گوش دادن...")
+            logger.info("📡 ربات آماده است. برای شروع 'روشن' را بفرستید.")
             await self.client.run_until_disconnected()
             
         except Exception as e:
             logger.error(f"خطا: {e}")
     
     def setup_handlers(self):
-        """تنظیم هندلرهای پیام - فقط به دستورات مستقیم پاسخ دهد"""
+        """تنظیم هندلرهای پیام"""
         
-        # **فقط وقتی مستقیم به خود ربات پیام می‌دهید**
-        @self.client.on(events.NewMessage(pattern='^(?i)(روشن|خاموش|سلف|حافظ|وضعیت|لیست|حذف فیلتر)'))
-        async def direct_command_handler(event):
-            """هندلر دستورات مستقیم"""
-            # بررسی کن که پیام مستقیم به خود ربات است
-            if event.is_private and event.sender_id == Config.ADMIN_USER_ID:
-                message = event.message.text.strip().lower()
-                logger.info(f"🔧 دستور مستقیم: {message}")
+        @self.client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private and e.sender_id == Config.ADMIN_USER_ID))
+        async def admin_handler(event):
+            """پردازش پیام‌های مدیر"""
+            message = event.message.text.strip().lower() if event.message.text else ""
+            
+            if not message:
+                return
+            
+            logger.info(f"📩 دستور مدیر: {message}")
+            
+            if message == "روشن":
+                self.is_monitoring = True
+                logger.info("✅ نظارت فعال شد")
+                await event.reply("✅ نظارت فعال شد! در حال جستجو...")
                 
-                if message == "روشن":
-                    self.is_monitoring = True
-                    await event.reply("✅ نظارت شروع شد!")
-                    
-                elif message == "خاموش":
-                    self.is_monitoring = False
-                    await event.reply("❌ نظارت متوقف شد.")
-                    
-                elif message == "سلف":
-                    self.current_filter = "سلف"
-                    await event.reply("🔍 فیلتر: سلف")
-                    
-                elif message == "حافظ":
-                    self.current_filter = "حافظ"
-                    await event.reply("🔍 فیلتر: حافظ")
-                    
-                elif message == "وضعیت":
-                    status = "فعال" if self.is_monitoring else "غیرفعال"
-                    await event.reply(f"📊 وضعیت:\n• نظارت: {status}\n• فیلتر: {self.current_filter}")
-                    
-                elif message == "لیست":
-                    if self.found_items:
-                        last = self.found_items[-1] if self.found_items else {}
-                        await event.reply(f"📝 آخرین غذا: {last.get('text', 'ندارد')[:100]}")
-                    else:
-                        await event.reply("📭 غذایی پیدا نشده")
+            elif message == "خاموش":
+                self.is_monitoring = False
+                logger.info("❌ نظارت متوقف شد")
+                await event.reply("❌ نظارت متوقف شد")
                 
-                elif "حذف فیلتر" in message:
-                    await event.reply("⚙️ این قابلیت بعداً اضافه می‌شود")
+            elif message == "سلف":
+                self.current_filter = "سلف"
+                logger.info("🔍 فیلتر: سلف")
+                await event.reply("🔍 فیلتر: سلف")
+                
+            elif message == "حافظ":
+                self.current_filter = "حافظ"
+                logger.info("🔍 فیلتر: حافظ")
+                await event.reply("🔍 فیلتر: حافظ")
+                
+            elif message == "وضعیت":
+                status = "فعال ✅" if self.is_monitoring else "غیرفعال ❌"
+                response = f"📊 وضعیت ربات:\n\n"
+                response += f"• نظارت: {status}\n"
+                response += f"• فیلتر: {self.current_filter}\n"
+                response += f"• غذاهای پیدا شده: {len(self.found_items)}\n"
+                response += f"• زمان شروع: {self.start_time.strftime('%H:%M:%S')}"
+                
+                await event.reply(response)
+                
+            elif message == "لیست":
+                if self.found_items:
+                    # آخرین ۳ غذا
+                    recent = self.found_items[-3:]
+                    response = "📋 آخرین غذاها:\n\n"
+                    for i, item in enumerate(recent[::-1], 1):
+                        time_str = item['time'].strftime('%H:%M')
+                        response += f"{i}. ⏰ {time_str} | {item['filter']}\n"
+                        response += f"   {item['text'][:80]}...\n\n"
+                    await event.reply(response)
+                else:
+                    await event.reply("📭 هنوز غذایی پیدا نشده")
+            
+            else:
+                await event.reply(
+                    "🤖 دستورات:\n"
+                    "• روشن - شروع\n"
+                    "• خاموش - توقف\n"
+                    "• سلف/حافظ - فیلتر\n"
+                    "• وضعیت - اطلاعات\n"
+                    "• لیست - آخرین غذاها"
+                )
         
-        # **هندلر گروه - فقط پیام‌های گروه را بررسی کند**
         @self.client.on(events.NewMessage(chats=Config.TARGET_GROUP_ID))
         async def group_handler(event):
-            """فقط پیام‌های گروه هدف"""
+            """پردازش پیام‌های گروه"""
             if not self.is_monitoring:
+                return
+            
+            # اگر پیام از خود ربات بود
+            if event.sender_id == self.bot_user_id:
                 return
             
             message_text = event.message.text or ""
             
-            # اگر پیام از خود ربات بود، نادیده بگیر
-            if event.sender_id == self.bot_user_id:
-                return
-            
-            # بررسی فیلتر
+            # اگر فیلتر در متن هست
             if self.current_filter in message_text:
                 sender = await event.get_sender()
                 
                 # ذخیره در تاریخچه
                 self.found_items.append({
                     'time': datetime.now(),
-                    'text': message_text[:150],
+                    'text': message_text[:100],
                     'seller': sender.id,
-                    'filter': self.current_filter
+                    'filter': self.current_filter,
+                    'seller_name': sender.first_name
                 })
                 
-                # لاگ ساده
-                logger.info(f"🍔 غذا پیدا شد: {self.current_filter} - {message_text[:50]}")
+                # لاگ کن
+                logger.info(f"🍔 غذا پیدا شد! ({self.current_filter})")
+                logger.info(f"   📝: {message_text[:50]}")
+                logger.info(f"   👤: {sender.first_name} (آی‌دی: {sender.id})")
                 
-                # گزارش به مدیر
-                try:
-                    await self.client.send_message(
-                        Config.ADMIN_USER_ID,
-                        f"🔔 غذا پیدا شد ({self.current_filter})\n"
-                        f"📝: {message_text[:100]}..."
-                    )
-                except:
-                    pass  # اگر نرسید مهم نیست
-                
-                # ارسال پیام به فروشنده (فقط یک بار)
+                # **ارسال پیام به فروشنده**
                 seller_key = f"{sender.id}_{self.current_filter}"
                 if seller_key not in self.sent_messages:
                     try:
+                        # پیام به فروشنده
                         await self.client.send_message(
                             sender.id,
-                            "سلام! خریدارم. قیمت و جزییات؟"
+                            "سلام! 👋\n"
+                            "خریدار غذا هستم. لطفاً:\n"
+                            "• قیمت\n"
+                            "• زمان تحویل\n"
+                            "• محل تحویل\n\n"
+                            "ممنون! 🙏"
                         )
-                        self.sent_messages[seller_key] = datetime.now()
                         
-                        # تأیید به مدیر
-                        await self.client.send_message(
-                            Config.ADMIN_USER_ID,
-                            f"✅ به فروشنده پیام دادم (آی‌دی: {sender.id})"
+                        self.sent_messages[seller_key] = datetime.now()
+                        logger.info(f"   📤 پیام به فروشنده ارسال شد")
+                        
+                        # گزارش به مدیر
+                        await event.reply(
+                            f"✅ به {sender.first_name} پیام دادم\n"
+                            f"📝: {message_text[:50]}..."
                         )
+                        
                     except Exception as e:
                         logger.error(f"خطا در ارسال: {e}")
+                        
+                        # اگر خطا داشت، فقط لاگ کن
+                        if "PEER_FLOOD" in str(e):
+                            logger.error("⚠️ محدودیت ارسال پیام! صبر کنید...")
+                        elif "USER_BLOCKED" in str(e):
+                            logger.error("⚠️ کاربر ربات را بلاک کرده")
+                        elif "CHAT_WRITE_FORBIDDEN" in str(e):
+                            logger.error("⚠️ امکان ارسال پیام به این کاربر نیست")
 
 monitor = FoodMonitor()
