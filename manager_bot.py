@@ -1,10 +1,16 @@
-# manager_bot.py
+import os
 from telegram.ext import Updater, CommandHandler
-import config
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+GROUP_ID = int(os.environ.get("GROUP_ID"))
 
 active = True
-filter_words = config.FILTER_WORDS
-updater = Updater(config.BOT_TOKEN, use_context=True)
+filter_words = [
+    "سلف", "سلف فروشی", "سلف میفروشم",
+    "حافظ", "حافظ فروشی", "حافظ میفروشم"
+]
+
+updater = Updater(BOT_TOKEN, use_context=True)
 
 def start(update, context):
     update.message.reply_text("مدیریت ربات فعال شد ✅")
@@ -24,7 +30,7 @@ def set_filter(update, context):
         update.message.reply_text("لطفاً کلمه جدید رو وارد کنید")
 
 def report_to_manager(text):
-    updater.bot.send_message(chat_id=config.GROUP_ID, text=text)
+    updater.bot.send_message(chat_id=GROUP_ID, text=text)
 
 updater.dispatcher.add_handler(CommandHandler("start", start))
 updater.dispatcher.add_handler(CommandHandler("toggle", toggle))
