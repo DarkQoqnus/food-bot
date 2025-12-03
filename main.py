@@ -2,7 +2,7 @@ import os, re, time, asyncio, threading, logging
 from collections import deque
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 from telegram.error import RetryAfter
 
 # ===== LOGGING =====
@@ -27,7 +27,7 @@ COOLDOWN_SECONDS, GLOBAL_RATE_SECONDS = 60, 5
 send_queue = deque()
 
 # ===== ADMINS =====
-admins = set([f"@{ADMIN_ID}"])  # شروع با ادمین اصلی (یوزرنیم یا ID)
+admins = set([f"@{ADMIN_ID}"])  # شروع با ادمین اصلی
 
 # ===== TELETHON CLIENT =====
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
@@ -68,7 +68,7 @@ def setcooldown(update, ctx):
     if ctx.args:
         try:
             COOLDOWN_SECONDS = int(ctx.args[0])
-            update.message.reply_text(f"تاخیر زمانی برای یک فرد مورد نظر تنظیم شد : {COOLDOWN_SECONDS}")
+            update.message.reply_text(f"⏱ تاخیر برای یک فروشنده تنظیم شد: {COOLDOWN_SECONDS}")
         except ValueError:
             update.message.reply_text("لطفاً عدد بده: /setcooldown 120")
 
@@ -78,7 +78,7 @@ def setrate(update, ctx):
     if ctx.args:
         try:
             GLOBAL_RATE_SECONDS = int(ctx.args[0])
-            update.message.reply_text(f"تاخیر زمانی برای افراد مختلف مورد نظر تنظیم شد : {GLOBAL_RATE_SECONDS}")
+            update.message.reply_text(f"⏱ تاخیر بین فروشنده‌های مختلف تنظیم شد: {GLOBAL_RATE_SECONDS}")
         except ValueError:
             update.message.reply_text("لطفاً عدد بده: /setrate 10")
 
@@ -88,14 +88,13 @@ def status(update, ctx):
     current_filter = state["filter_words"][0] if state["filter_words"] else "-"
     contacted_count = len(contacted_sellers)
     update.message.reply_text(
-        f"📊 وضعیت ربات :\n"
-        f"شنود : {status_text}\n"
-        f"فیلتر مورد نظر : {current_filter}\n"
-        f"فروشنده‌های اخیر : {contacted_count}\n"
-        f"تاخیر زمانی برای پیام دادن به یک فرد  = {COOLDOWN_SECONDS}\n"
-        f"تاخیر زمانی پیام دادن به افراد مختلف = {GLOBAL_RATE_SECONDS}"
+        f"📊 وضعیت ربات:\n"
+        f"شنود: {status_text}\n"
+        f"فیلتر مورد نظر: {current_filter}\n"
+        f"فروشنده‌های اخیر: {contacted_count}\n"
+        f"تاخیر برای یک فروشنده = {COOLDOWN_SECONDS}\n"
+        f"تاخیر برای فروشنده های مختلف = {GLOBAL_RATE_SECONDS}"
     )
-
 
 def send(update, ctx):
     if not is_admin(update): return
@@ -216,4 +215,3 @@ async def group_listener(event):
         send_queue.append((sender_id, "من می‌خرم ✅"))
         contacted_sellers.add(sender_id)
         seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-        await safe_send(f"به فروشنده {seller_name
