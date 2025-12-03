@@ -2,7 +2,7 @@ import os, re, time, asyncio, threading, logging
 from collections import deque
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler
 from telegram.error import RetryAfter
 
 # ===== LOGGING =====
@@ -15,7 +15,7 @@ API_HASH = os.environ["API_HASH"]
 SESSION_STRING = os.environ["SESSION_STRING"]
 GROUP_ID = int(os.environ["GROUP_ID"])
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-ADMIN_ID = int(os.environ["ADMIN_ID"])
+ADMIN_ID = int(os.environ["ADMIN_ID"])  # ادمین اصلی (ID عددی تو)
 
 # ===== STATE =====
 state = {
@@ -27,7 +27,7 @@ COOLDOWN_SECONDS, GLOBAL_RATE_SECONDS = 60, 5
 send_queue = deque()
 
 # ===== ADMINS =====
-admins = set([f"@{ADMIN_ID}"])  # شروع با ادمین اصلی
+admins = set()  # لیست یوزرنیم‌ها، مدیریت فقط توسط ADMIN_ID اصلی
 
 # ===== TELETHON CLIENT =====
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
@@ -92,8 +92,8 @@ def status(update, ctx):
         f"شنود: {status_text}\n"
         f"فیلتر مورد نظر: {current_filter}\n"
         f"فروشنده‌های اخیر: {contacted_count}\n"
-        f"تاخیر برای یک فروشنده = {COOLDOWN_SECONDS}\n"
-        f"تاخیر برای فروشنده های مختلف = {GLOBAL_RATE_SECONDS}"
+        f"COOLDOWN_SECONDS = {COOLDOWN_SECONDS}\n"
+        f"GLOBAL_RATE_SECONDS = {GLOBAL_RATE_SECONDS}"
     )
 
 def send(update, ctx):
@@ -121,7 +121,8 @@ def send(update, ctx):
     update.message.reply_text(f"در حال ارسال به {uname}...")
 
 def newadmin(update, ctx):
-    if not is_admin(update): return
+    if update.effective_user.id != ADMIN_ID:  # فقط ادمین اصلی
+        return
     if not ctx.args:
         update.message.reply_text("فرمت درست: /newadmin @username")
         return
@@ -130,7 +131,8 @@ def newadmin(update, ctx):
     update.message.reply_text(f"✅ {uname} به لیست ادمین‌ها اضافه شد.")
 
 def removeadmin(update, ctx):
-    if not is_admin(update): return
+    if update.effective_user.id != ADMIN_ID:  # فقط ادمین اصلی
+        return
     if not ctx.args:
         update.message.reply_text("فرمت درست: /removeadmin @username")
         return
@@ -142,7 +144,8 @@ def removeadmin(update, ctx):
         update.message.reply_text(f"{uname} در لیست ادمین‌ها نبود.")
 
 def list_admins(update, ctx):
-    if not is_admin(update): return
+    if update.effective_user.id != ADMIN_ID:  # فقط ادمین اصلی
+        return
     if not admins:
         update.message.reply_text("هیچ ادمینی ثبت نشده.")
         return
