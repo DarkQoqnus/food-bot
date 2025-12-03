@@ -20,9 +20,8 @@ ADMIN_ID = int(os.environ["ADMIN_ID"])
 # ===== STATE =====
 state = {
     "active": False,       # شروع خاموش
-    "filter_words": [],    # لیست خالی، یعنی هیچ فیلتری فعال نیست
+    "filter_words": [],    # بدون فیلتر اولیه
 }
-
 contacted_sellers, seller_last_dm_at = set(), {}
 COOLDOWN_SECONDS, GLOBAL_RATE_SECONDS = 60, 5
 send_queue = deque()
@@ -56,6 +55,26 @@ def setfilter(update, ctx):
     else:
         update.message.reply_text("یک کلمه بده: /setfilter سلف")
 
+def setcooldown(update, ctx):
+    global COOLDOWN_SECONDS
+    if not is_admin(update): return
+    if ctx.args:
+        try:
+            COOLDOWN_SECONDS = int(ctx.args[0])
+            update.message.reply_text(f"⏱ COOLDOWN_SECONDS تنظیم شد: {COOLDOWN_SECONDS}")
+        except ValueError:
+            update.message.reply_text("لطفاً عدد بده: /setcooldown 120")
+
+def setrate(update, ctx):
+    global GLOBAL_RATE_SECONDS
+    if not is_admin(update): return
+    if ctx.args:
+        try:
+            GLOBAL_RATE_SECONDS = int(ctx.args[0])
+            update.message.reply_text(f"⏱ GLOBAL_RATE_SECONDS تنظیم شد: {GLOBAL_RATE_SECONDS}")
+        except ValueError:
+            update.message.reply_text("لطفاً عدد بده: /setrate 10")
+
 def status(update, ctx):
     if not is_admin(update): return
     status_text = "روشن ✅" if state["active"] else "خاموش ❌"
@@ -65,9 +84,10 @@ def status(update, ctx):
         f"📊 وضعیت ربات:\n"
         f"شنود: {status_text}\n"
         f"فیلتر مورد نظر: {current_filter}\n"
-        f"فروشنده‌های اخیر: {contacted_count}"
+        f"فروشنده‌های اخیر: {contacted_count}\n"
+        f"COOLDOWN_SECONDS = {COOLDOWN_SECONDS}\n"
+        f"GLOBAL_RATE_SECONDS = {GLOBAL_RATE_SECONDS}"
     )
-
 
 def send(update, ctx):
     if not is_admin(update): return
@@ -103,14 +123,13 @@ async def safe_send(text):
         logging.error(f"Report error: {e}")
 
 def normalize_text(t): 
-    t = (t or "").replace('\u200c', ' ').strip()  # نیم‌فاصله → فاصله
+    t = (t or "").replace('\u200c', ' ').strip()
     t = re.sub(r'\s+', ' ', t)
     t = t.replace('ي','ی').replace('ك','ک')
     return t
 
 def match_sale(text, filters):
     t = normalize_text(text)
-    # regex شامل نیم‌فاصله هم هست
     has_sale = re.search(r'(فروشی|می[\s\u200c]*فروشم)', t)
     filters_regex = r'(' + '|'.join(map(re.escape, filters)) + r')'
     has_filter = re.search(filters_regex, t)
@@ -169,11 +188,10 @@ async def private_replies(event):
     except Exception:
         return
     if user_id in contacted_sellers:
-        msg = event.message.message or ""  # متن کامل بدون تغییر
+        msg = event.message.message or ""
         if msg:
             await asyncio.sleep(1)
             seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            # خط فاصله بعد از اسم فروشنده
             await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
 
 def run_bot(): updater.start_polling()
@@ -188,6 +206,8 @@ dp.add_handler(CommandHandler("toggle", toggle))
 dp.add_handler(CommandHandler("setfilter", setfilter))
 dp.add_handler(CommandHandler("status", status))
 dp.add_handler(CommandHandler("send", send))
+dp.add_handler(CommandHandler("setcooldown", setcooldown))
+dp.add_handler(CommandHandler("setrate", setrate))
 
 if __name__ == "__main__":
     asyncio.run(run())
