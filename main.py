@@ -26,6 +26,9 @@ contacted_sellers, seller_last_dm_at = set(), {}
 COOLDOWN_SECONDS, GLOBAL_RATE_SECONDS = 60, 5
 send_queue = deque()
 
+# ===== ADMINS =====
+admins = set([f"@{ADMIN_ID}"])  # شروع با ادمین اصلی (یوزرنیم یا ID)
+
 # ===== TELETHON CLIENT =====
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -33,9 +36,13 @@ client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 updater = Updater(BOT_TOKEN, use_context=True)
 dp = updater.dispatcher
 
-def is_admin(update): 
-    return update.effective_user and update.effective_user.id == ADMIN_ID
+def is_admin(update):
+    uname = f"@{update.effective_user.username}" if update.effective_user.username else None
+    return update.effective_user and (
+        update.effective_user.id == ADMIN_ID or (uname and uname in admins)
+    )
 
+# ===== COMMANDS =====
 def start(update, ctx):
     if not is_admin(update): return
     uname = update.effective_user.username
@@ -61,7 +68,7 @@ def setcooldown(update, ctx):
     if ctx.args:
         try:
             COOLDOWN_SECONDS = int(ctx.args[0])
-            update.message.reply_text(f"تاخیر زمانی برای پیام دادن به یک فرد : {COOLDOWN_SECONDS}")
+            update.message.reply_text(f"تاخیر زمانی برای یک فرد مورد نظر تنظیم شد : {COOLDOWN_SECONDS}")
         except ValueError:
             update.message.reply_text("لطفاً عدد بده: /setcooldown 120")
 
@@ -71,7 +78,7 @@ def setrate(update, ctx):
     if ctx.args:
         try:
             GLOBAL_RATE_SECONDS = int(ctx.args[0])
-            update.message.reply_text(f"تاخیر زمانی پیام دادن به افراد مختلف : {GLOBAL_RATE_SECONDS}")
+            update.message.reply_text(f"تاخیر زمانی برای افراد مختلف مورد نظر تنظیم شد : {GLOBAL_RATE_SECONDS}")
         except ValueError:
             update.message.reply_text("لطفاً عدد بده: /setrate 10")
 
@@ -81,13 +88,14 @@ def status(update, ctx):
     current_filter = state["filter_words"][0] if state["filter_words"] else "-"
     contacted_count = len(contacted_sellers)
     update.message.reply_text(
-        f"📊 وضعیت ربات:\n"
-        f"شنود: {status_text}\n"
-        f"فیلتر مورد نظر: {current_filter}\n"
-        f"فروشنده‌های اخیر: {contacted_count}\n"
-        f"COOLDOWN_SECONDS = {COOLDOWN_SECONDS}\n"
-        f"GLOBAL_RATE_SECONDS = {GLOBAL_RATE_SECONDS}"
+        f"📊 وضعیت ربات :\n"
+        f"شنود : {status_text}\n"
+        f"فیلتر مورد نظر : {current_filter}\n"
+        f"فروشنده‌های اخیر : {contacted_count}\n"
+        f"تاخیر زمانی برای پیام دادن به یک فرد  = {COOLDOWN_SECONDS}\n"
+        f"تاخیر زمانی پیام دادن به افراد مختلف = {GLOBAL_RATE_SECONDS}"
     )
+
 
 def send(update, ctx):
     if not is_admin(update): return
@@ -113,6 +121,38 @@ def send(update, ctx):
     asyncio.create_task(do_send())
     update.message.reply_text(f"در حال ارسال به {uname}...")
 
+def newadmin(update, ctx):
+    if not is_admin(update): return
+    if not ctx.args:
+        update.message.reply_text("فرمت درست: /newadmin @username")
+        return
+    uname = ctx.args[0].strip()
+    admins.add(uname)
+    update.message.reply_text(f"✅ {uname} به لیست ادمین‌ها اضافه شد.")
+
+def removeadmin(update, ctx):
+    if not is_admin(update): return
+    if not ctx.args:
+        update.message.reply_text("فرمت درست: /removeadmin @username")
+        return
+    uname = ctx.args[0].strip()
+    if uname in admins:
+        admins.remove(uname)
+        update.message.reply_text(f"❌ {uname} از لیست ادمین‌ها حذف شد.")
+    else:
+        update.message.reply_text(f"{uname} در لیست ادمین‌ها نبود.")
+
+def list_admins(update, ctx):
+    if not is_admin(update): return
+    if not admins:
+        update.message.reply_text("هیچ ادمینی ثبت نشده.")
+        return
+    text = "👥 لیست ادمین‌ها:\n"
+    for i, uname in enumerate(admins, start=1):
+        text += f"{i} - {uname}\n"
+    update.message.reply_text(text)
+
+# ===== HELPERS =====
 async def safe_send(text):
     try:
         updater.bot.send_message(chat_id=ADMIN_ID, text=text)
@@ -159,6 +199,7 @@ async def sender_loop():
         else:
             await asyncio.sleep(0.5)
 
+# ===== TELETHON EVENTS =====
 @client.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
     if not state["active"]: return
@@ -175,39 +216,4 @@ async def group_listener(event):
         send_queue.append((sender_id, "من می‌خرم ✅"))
         contacted_sellers.add(sender_id)
         seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-        await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی: {text}")
-
-@client.on(events.NewMessage())
-async def private_replies(event):
-    if not event.is_private: return
-    user_id = event.sender_id
-    if user_id == ADMIN_ID: return
-    try:
-        sender = await event.get_sender()
-        if getattr(sender, "bot", False): return
-    except Exception:
-        return
-    if user_id in contacted_sellers:
-        msg = event.message.message or ""
-        if msg:
-            await asyncio.sleep(1)
-            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
-
-def run_bot(): updater.start_polling()
-async def run():
-    await client.start()
-    threading.Thread(target=run_bot, daemon=True).start()
-    asyncio.create_task(sender_loop())
-    await client.run_until_disconnected()
-
-dp.add_handler(CommandHandler("start", start))
-dp.add_handler(CommandHandler("toggle", toggle))
-dp.add_handler(CommandHandler("setfilter", setfilter))
-dp.add_handler(CommandHandler("status", status))
-dp.add_handler(CommandHandler("send", send))
-dp.add_handler(CommandHandler("setcooldown", setcooldown))
-dp.add_handler(CommandHandler("setrate", setrate))
-
-if __name__ == "__main__":
-    asyncio.run(run())
+        await safe_send(f"به فروشنده {seller_name
