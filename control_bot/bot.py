@@ -1,102 +1,43 @@
-# control_bot/bot.py - به‌روزشده
-
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from shared.config import Config
-from shared.database import db
 import os
 import time
 
-bot = telebot.TeleBot(Config.BOT_TOKEN, parse_mode=None)
-
-def cleanup_previous_session():
-    """پاکسازی session قبلی"""
-    print("🧹 پاکسازی connection‌های قبلی...")
-    
-    # حذف webhook اگر وجود دارد
-    try:
-        bot.delete_webhook()
-        print("✅ Webhook قبلی حذف شد")
-        time.sleep(1)
-    except:
-        print("ℹ️ هیچ webhook فعالی یافت نشد")
-    
-    # دریافت وضعیت
-    try:
-        webhook_info = bot.get_webhook_info()
-        if webhook_info.url:
-            print(f"⚠️ هنوز webhook فعال است: {webhook_info.url}")
-    except:
-        pass
-    
-    time.sleep(2)
+TOKEN = os.getenv("BOT_TOKEN")
+bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler(commands=['start'])
-def start_command(message):
-    """دستور شروع"""
-    welcome_text = """
-    🍱 **ربات خرید خودکار غذا**
-    
-    دستورات:
-    /on - شروع نظارت
-    /off - توقف نظارت
-    /filter - تغییر فیلتر جستجو
-    /status - وضعیت فعلی
-    """
-    
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("🟢 شروع", callback_data="start_monitor"),
-        InlineKeyboardButton("🔴 توقف", callback_data="stop_monitor"),
-        InlineKeyboardButton("⚙️ فیلتر", callback_data="change_filter"),
-        InlineKeyboardButton("📊 وضعیت", callback_data="show_status")
-    )
-    
-    bot.send_message(message.chat.id, welcome_text, 
-                    reply_markup=keyboard, parse_mode='Markdown')
+def start(message):
+    bot.reply_to(message, "ربات فعال است")
 
-# ... (بقیه هندلرها همانطور که قبلاً بودند)
+@bot.message_handler(commands=['on'])
+def on(message):
+    bot.reply_to(message, "نظارت شروع شد")
+
+@bot.message_handler(commands=['off'])
+def off(message):
+    bot.reply_to(message, "نظارت متوقف شد")
+
+@bot.message_handler(commands=['filter'])
+def filter_cmd(message):
+    bot.reply_to(message, "فیلتر تنظیم شد")
 
 def start_bot():
-    """شروع کنترل‌بات"""
-    print("🤖 کنترل‌بات شروع به کار کرد...")
+    print("🤖 شروع کنترل‌بات...")
     
-    # پاکسازی قبل از شروع
-    cleanup_previous_session()
-    
-    # تلاش برای شروع با retry
-    max_retries = 5
-    retry_delay = 5
-    
-    for attempt in range(max_retries):
-        try:
-            print(f"🔄 تلاش {attempt + 1} از {max_retries}...")
-            
-            # تست اتصال
-            me = bot.get_me()
-            print(f"✅ احراز هویت موفق: @{me.username}")
-            
-            # شروع polling با تنظیمات خاص
-            bot.polling(
-                none_stop=True,
-                interval=2,
-                timeout=20,
-                skip_pending=True,  # مهم!
-                allowed_updates=None,
-                restart_on_change=False
-            )
-            break  # اگر موفق شد، حلقه را بشکن
-            
-        except telebot.apihelper.ApiTelegramException as e:
-            if "409" in str(e):
-                print(f"⚠️ خطای 409 (Conflict). صبر {retry_delay} ثانیه...")
-                time.sleep(retry_delay)
-                retry_delay += 2  # افزایش تاخیر
-            else:
-                print(f"❌ خطای دیگر: {e}")
-                break
-        except Exception as e:
-            print(f"❌ خطای غیرمنتظره: {e}")
-            break
-    else:
-        print("❌ تمام تلاش‌ها ناموفق بود")
+    try:
+        # حذف webhook قبلی
+        bot.delete_webhook()
+        time.sleep(1)
+        
+        # شروع polling
+        bot.polling(
+            skip_pending=True,
+            none_stop=True,
+            interval=2,
+            timeout=20
+        )
+    except Exception as e:
+        print(f"خطا: {e}")
+
+if __name__ == "__main__":
+    start_bot()
