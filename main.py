@@ -61,7 +61,7 @@ def setcooldown(update, ctx):
     if ctx.args:
         try:
             COOLDOWN_SECONDS = int(ctx.args[0])
-            update.message.reply_text(f"⏱ COOLDOWN_SECONDS تنظیم شد: {COOLDOWN_SECONDS}")
+            update.message.reply_text(f"تاخیر زمانی برای پیام دادن به یک فرد : {COOLDOWN_SECONDS}")
         except ValueError:
             update.message.reply_text("لطفاً عدد بده: /setcooldown 120")
 
@@ -71,7 +71,7 @@ def setrate(update, ctx):
     if ctx.args:
         try:
             GLOBAL_RATE_SECONDS = int(ctx.args[0])
-            update.message.reply_text(f"⏱ GLOBAL_RATE_SECONDS تنظیم شد: {GLOBAL_RATE_SECONDS}")
+            update.message.reply_text(f"تاخیر زمانی پیام دادن به افراد مختلف : {GLOBAL_RATE_SECONDS}")
         except ValueError:
             update.message.reply_text("لطفاً عدد بده: /setrate 10")
 
