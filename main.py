@@ -4,6 +4,7 @@ from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telegram.ext import Updater, CommandHandler
 from telegram.error import RetryAfter
+from telegram.ext import MessageHandler, Filters
 
 # ===== LOGGING =====
 logging.basicConfig(level=logging.INFO, filename='bot.log',
@@ -185,6 +186,9 @@ def list_admins(update, ctx):
         text += f"{i} - {uname}\n"
     update.message.reply_text(text)
 
+def unknown(update, ctx):
+    update.message.reply_text("❌ کامند مورد نظر یافت نشد!!!")
+
 # ===== HELPERS =====
 async def safe_send(text):
     try:
@@ -302,6 +306,9 @@ dp.add_handler(CommandHandler("setrate", setrate))
 dp.add_handler(CommandHandler("newadmin", newadmin))
 dp.add_handler(CommandHandler("removeadmin", removeadmin))
 dp.add_handler(CommandHandler("admins", list_admins))
+
+# هندلر برای کامندهای ناشناخته
+dp.add_handler(MessageHandler(Filters.command, unknown))
 
 if __name__ == "__main__":
     asyncio.run(run())
