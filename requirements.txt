@@ -1,7 +1,3 @@
 telethon==1.34.0
 pyrogram==2.0.106
-pytelegrambotapi==4.20.0  # به‌جای telebot
 python-dotenv==1.0.0
-redis==5.0.1
-apscheduler==3.10.4
-pymongo[srv]==4.6.0
