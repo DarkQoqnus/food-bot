@@ -64,11 +64,8 @@ def cancel(update, ctx):
     update.message.reply_text("فرایند لغو شد.")
     return ConversationHandler.END
 
-def main():
-    updater = Updater(os.environ["BOT_TOKEN"], use_context=True)
-    dp = updater.dispatcher
-
-    conv_handler = ConversationHandler(
+def get_conv_handler():
+    return ConversationHandler(
         entry_points=[CommandHandler("session", session_start)],
         states={
             API_ID_STEP: [MessageHandler(Filters.text & ~Filters.command, get_api_id)],
@@ -80,8 +77,11 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
-    dp.add_handler(conv_handler)
 
+def main():
+    updater = Updater(os.environ["BOT_TOKEN"], use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(conv_handler)
     updater.start_polling()
     updater.idle()
 
