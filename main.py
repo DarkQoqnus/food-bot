@@ -308,11 +308,11 @@ dp.add_handler(CommandHandler("newadmin", newadmin))
 dp.add_handler(CommandHandler("removeadmin", removeadmin))
 dp.add_handler(CommandHandler("admins", list_admins))
 
-# هندلر برای کامندهای ناشناخته
-dp.add_handler(MessageHandler(Filters.command, unknown))
-
 from get_session import get_conv_handler
 dp.add_handler(get_conv_handler())
+
+# هندلر برای کامندهای ناشناخته
+dp.add_handler(MessageHandler(Filters.command, unknown))
 
 if __name__ == "__main__":
     asyncio.run(run())
