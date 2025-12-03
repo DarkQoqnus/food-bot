@@ -124,8 +124,8 @@ def status(update, ctx):
         f"شنود: {status_text}\n"
         f"فیلتر مورد نظر: {st['filter']}\n"
         f"فروشنده‌های اخیر: {st['contacted_count']}\n"
-        f"COOLDOWN_SECONDS = {st['cooldown']}\n"
-        f"GLOBAL_RATE_SECONDS = {st['rate']}"
+        f"تاخیر برای فروشنده = {st['cooldown']}\n"
+        f"تاخیر برای فروشنده های مختلف = {st['rate']}"
     )
 
 def send(update, ctx):
