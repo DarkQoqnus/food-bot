@@ -215,3 +215,48 @@ async def group_listener(event):
         send_queue.append((sender_id, "من می‌خرم ✅"))
         contacted_sellers.add(sender_id)
         seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+        await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}")
+
+@client.on(events.NewMessage())
+async def private_replies(event):
+    if not event.is_private: return
+    user_id = event.sender_id
+    if user_id == ADMIN_ID: return
+    try:
+        sender = await event.get_sender()
+        if getattr(sender, "bot", False): return
+    except Exception:
+        return
+    if user_id in contacted_sellers:
+        msg = event.message.message or ""
+        if msg:
+            await asyncio.sleep(1)
+            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+            await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
+
+# ===== RUN =====
+def run_bot():
+    updater.start_polling()
+
+async def run():
+    await client.start()
+    threading.Thread(target=run_bot, daemon=True).start()
+    asyncio.create_task(sender_loop())
+    await client.run_until_disconnected()
+
+# ===== HANDLERS =====
+dp.add_handler(CommandHandler("start", start))
+dp.add_handler(CommandHandler("toggle", toggle))
+dp.add_handler(CommandHandler("setfilter", setfilter))
+dp.add_handler(CommandHandler("status", status))
+dp.add_handler(CommandHandler("send", send))
+
+# دستورات جدید
+dp.add_handler(CommandHandler("setcooldown", setcooldown))
+dp.add_handler(CommandHandler("setrate", setrate))
+dp.add_handler(CommandHandler("newadmin", newadmin))
+dp.add_handler(CommandHandler("removeadmin", removeadmin))
+dp.add_handler(CommandHandler("admins", list_admins))
+
+if __name__ == "__main__":
+    asyncio.run(run())
