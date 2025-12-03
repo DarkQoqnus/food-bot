@@ -1,7 +1,7 @@
 import os
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
+from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler
 
 # فقط برای مدیر اصلی
 OWNER_ID = int(os.environ["ADMIN_ID"])
@@ -76,14 +76,3 @@ def get_conv_handler():
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-
-
-def main():
-    updater = Updater(os.environ["BOT_TOKEN"], use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(conv_handler)
-    updater.start_polling()
-    updater.idle()
-
-if __name__ == "__main__":
-    main()
