@@ -20,8 +20,9 @@ ADMIN_ID = int(os.environ["ADMIN_ID"])
 # ===== STATE =====
 state = {
     "active": False,       # شروع خاموش
-    "filter_words": [""],  # بدون فیلتر اولیه
+    "filter_words": [],    # لیست خالی، یعنی هیچ فیلتری فعال نیست
 }
+
 contacted_sellers, seller_last_dm_at = set(), {}
 COOLDOWN_SECONDS, GLOBAL_RATE_SECONDS = 60, 5
 send_queue = deque()
@@ -58,7 +59,7 @@ def setfilter(update, ctx):
 def status(update, ctx):
     if not is_admin(update): return
     status_text = "روشن ✅" if state["active"] else "خاموش ❌"
-    current_filter = state["filter_words"][0] if state["filter_words"] and state["filter_words"][0] else "-"
+    current_filter = state["filter_words"][0] if state["filter_words"] else "-"
     contacted_count = len(contacted_sellers)
     update.message.reply_text(
         f"📊 وضعیت ربات:\n"
@@ -66,6 +67,7 @@ def status(update, ctx):
         f"فیلتر مورد نظر: {current_filter}\n"
         f"فروشنده‌های اخیر: {contacted_count}"
     )
+
 
 def send(update, ctx):
     if not is_admin(update): return
