@@ -1,4 +1,5 @@
 import os
+import asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telegram import Update
@@ -9,6 +10,17 @@ OWNER_ID = int(os.environ["ADMIN_ID"])
 
 # مراحل گفتگو
 API_ID_STEP, API_HASH_STEP, PHONE_STEP, CODE_STEP, PASSWORD_STEP = range(5)
+
+
+def _ensure_loop(ctx: CallbackContext) -> asyncio.AbstractEventLoop:
+    loop = ctx.user_data.get("loop")
+    if loop and not loop.is_closed():
+        return loop
+    # ساخت یک loop جدید برای ترد هندلر
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    ctx.user_data["loop"] = loop
+    return loop
 
 
 def session_start(update: Update, ctx: CallbackContext) -> int:
@@ -45,18 +57,24 @@ def get_phone(update: Update, ctx: CallbackContext) -> int:
     api_id = ctx.user_data["api_id"]
     api_hash = ctx.user_data["api_hash"]
 
+    # ساخت loop و کلاینت
+    loop = _ensure_loop(ctx)
+    client = TelegramClient(StringSession(), api_id, api_hash)
+    ctx.user_data["client"] = client
+
     try:
-        client = TelegramClient(StringSession(), api_id, api_hash)
-        client.connect()
-        ctx.user_data["client"] = client
-
-        # درخواست کد همین‌جا
-        client.send_code_request(phone)
-
+        # اتصال و درخواست کد با loop
+        loop.run_until_complete(client.connect())
+        loop.run_until_complete(client.send_code_request(phone))
         update.message.reply_text("کدی که تلگرام فرستاد را وارد کنید:")
         return CODE_STEP
     except Exception as e:
         update.message.reply_text(f"❌ خطا در ارسال کد: {e}")
+        # تمیزکاری
+        try:
+            loop.run_until_complete(client.disconnect())
+        except:
+            pass
         return ConversationHandler.END
 
 
@@ -75,22 +93,31 @@ def get_password(update: Update, ctx: CallbackContext) -> int:
     api_hash = ctx.user_data["api_hash"]
     phone = ctx.user_data["phone"]
     code = ctx.user_data["code"]
-    client = ctx.user_data.get("client")
+
+    loop: asyncio.AbstractEventLoop = _ensure_loop(ctx)
+    client: TelegramClient = ctx.user_data.get("client") or TelegramClient(StringSession(), api_id, api_hash)
 
     try:
-        if client is None:
-            client = TelegramClient(StringSession(), api_id, api_hash)
-            client.connect()
+        # اگر کلاینت از قبل نبود، وصل شو
+        if not ctx.user_data.get("client"):
+            ctx.user_data["client"] = client
+            loop.run_until_complete(client.connect())
 
-        client.sign_in(phone=phone, code=code, password=password)
+        # ورود با کد و در صورت نیاز رمز دو مرحله‌ای
+        loop.run_until_complete(client.sign_in(phone=phone, code=code, password=password))
         session_string = client.session.save()
         update.message.reply_text(f"✅ Session String شما:\n\n{session_string}")
     except Exception as e:
         update.message.reply_text(f"❌ خطا در ورود: {e}")
     finally:
+        # قطع اتصال و بستن loop
         try:
-            if client:
-                client.disconnect()
+            loop.run_until_complete(client.disconnect())
+        except:
+            pass
+        try:
+            if loop and not loop.is_closed():
+                loop.close()
         except:
             pass
         ctx.user_data.clear()
@@ -99,12 +126,20 @@ def get_password(update: Update, ctx: CallbackContext) -> int:
 
 
 def cancel(update: Update, ctx: CallbackContext) -> int:
-    client = ctx.user_data.get("client")
+    loop: asyncio.AbstractEventLoop = ctx.user_data.get("loop")
+    client: TelegramClient = ctx.user_data.get("client")
+
     try:
-        if client:
-            client.disconnect()
+        if client and loop:
+            loop.run_until_complete(client.disconnect())
     except:
         pass
+    try:
+        if loop and not loop.is_closed():
+            loop.close()
+    except:
+        pass
+
     ctx.user_data.clear()
     update.message.reply_text("فرایند لغو شد.")
     return ConversationHandler.END
