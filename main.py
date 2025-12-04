@@ -4,8 +4,7 @@ from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telegram.ext import Updater, CommandHandler
 from telegram.error import RetryAfter
-from telegram.ext import MessageHandler, filters
-from telegram.ext import ConversationHandler, MessageHandler, Filters
+from telegram.ext import ConversationHandler, MessageHandler, filters
 
 # ===== LOGGING =====
 logging.basicConfig(level=logging.INFO, filename='bot.log',
