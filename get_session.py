@@ -3,7 +3,7 @@ import asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telegram import Update
-from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
+from telegram.ext import CommandHandler, MessageHandler, filters, ConversationHandler, CallbackContext
 
 # فقط برای مدیر اصلی
 OWNER_ID = int(os.environ["ADMIN_ID"])
@@ -149,11 +149,11 @@ def get_conv_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CommandHandler("session", session_start)],
         states={
-            API_ID_STEP: [MessageHandler(Filters.text & ~Filters.command, get_api_id)],
-            API_HASH_STEP: [MessageHandler(Filters.text & ~Filters.command, get_api_hash)],
-            PHONE_STEP: [MessageHandler(Filters.text & ~Filters.command, get_phone)],
-            CODE_STEP: [MessageHandler(Filters.text & ~Filters.command, get_code)],
-            PASSWORD_STEP: [MessageHandler(Filters.text & ~Filters.command, get_password)],
+            API_ID_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_api_id)],
+            API_HASH_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_api_hash)],
+            PHONE_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
+            CODE_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_code)],
+            PASSWORD_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_password)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
