@@ -296,14 +296,9 @@ app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
 # ===== اجرای نهایی =====
 if __name__ == "__main__":
-    async def main():
-        # استارت کلاینت Telethon
-        await client.start()
-        # راه‌اندازی حلقه‌ی ارسال پیام‌ها
-        asyncio.create_task(sender_loop())
-        # اجرای ربات تلگرام (این خودش loop رو مدیریت می‌کند)
-        app.run_polling()
+    client.start()
+    asyncio.get_event_loop().create_task(sender_loop())
+    app.run_polling()
 
-    asyncio.run(main())
 
 
