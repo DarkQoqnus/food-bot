@@ -17,19 +17,41 @@ def session_start(update, ctx):
     return API_ID_STEP
 
 def get_api_id(update, ctx):
-    ctx.user_data["api_id"] = int(update.message.text.strip())
+    text = update.message.text.strip()
+    if not text.isdigit():
+        update.message.reply_text("❌ لطفاً فقط عدد معتبر وارد کنید برای API_ID:")
+        return API_ID_STEP
+    ctx.user_data["api_id"] = int(text)
     update.message.reply_text("حالا API_HASH خود را وارد کنید:")
     return API_HASH_STEP
 
 def get_api_hash(update, ctx):
     ctx.user_data["api_hash"] = update.message.text.strip()
-    update.message.reply_text("شماره تلفن خود را وارد کنید (با کد کشور):")
+    update.message.reply_text("شماره تلفن خود را وارد کنید (با کد کشور، مثل +989xxxxxxxxx):")
     return PHONE_STEP
 
 def get_phone(update, ctx):
-    ctx.user_data["phone"] = update.message.text.strip()
-    update.message.reply_text("کدی که تلگرام فرستاد را وارد کنید:")
-    return CODE_STEP
+    phone = update.message.text.strip()
+    if not phone.startswith("+") or not phone[1:].isdigit():
+        update.message.reply_text("❌ فرمت شماره نامعتبره. به شکل +989xxxxxxxxx وارد کن.")
+        return PHONE_STEP
+
+    ctx.user_data["phone"] = phone
+    api_id = ctx.user_data["api_id"]
+    api_hash = ctx.user_data["api_hash"]
+
+    try:
+        client = TelegramClient(StringSession(), api_id, api_hash)
+        client.connect()
+        ctx.user_data["client"] = client
+
+        # درخواست کد
+        client.send_code_request(phone)
+        update.message.reply_text("کدی که تلگرام فرستاد را وارد کنید:")
+        return CODE_STEP
+    except Exception as e:
+        update.message.reply_text(f"❌ خطا در ارسال کد: {e}")
+        return ConversationHandler.END
 
 def get_code(update, ctx):
     ctx.user_data["code"] = update.message.text.strip()
@@ -46,21 +68,36 @@ def get_password(update, ctx):
     api_hash = ctx.user_data["api_hash"]
     phone = ctx.user_data["phone"]
     code = ctx.user_data["code"]
+    client = ctx.user_data.get("client")
 
     try:
-        client = TelegramClient(StringSession(), api_id, api_hash)
-        client.connect()
-        if not client.is_user_authorized():
-            client.sign_in(phone=phone, code=code, password=password)
+        if client is None:
+            client = TelegramClient(StringSession(), api_id, api_hash)
+            client.connect()
+
+        client.sign_in(phone=phone, code=code, password=password)
         session_string = client.session.save()
         update.message.reply_text(f"✅ Session String شما:\n\n{session_string}")
-        client.disconnect()
     except Exception as e:
-        update.message.reply_text(f"❌ خطا: {e}")
+        update.message.reply_text(f"❌ خطا در ورود: {e}")
+    finally:
+        try:
+            if client:
+                client.disconnect()
+        except:
+            pass
+        ctx.user_data.clear()
 
     return ConversationHandler.END
 
 def cancel(update, ctx):
+    client = ctx.user_data.get("client")
+    try:
+        if client:
+            client.disconnect()
+    except:
+        pass
+    ctx.user_data.clear()
     update.message.reply_text("فرایند لغو شد.")
     return ConversationHandler.END
 
