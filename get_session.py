@@ -1,4 +1,5 @@
 import os
+import asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler
@@ -27,7 +28,7 @@ def get_api_id(update, ctx):
 
 def get_api_hash(update, ctx):
     ctx.user_data["api_hash"] = update.message.text.strip()
-    update.message.reply_text("شماره تلفن خود را وارد کنید (با کد کشور، مثل +989xxxxxxxxx):")
+    update.message.reply_text("شماره تلفن خود را وارد کنید (مثل +989xxxxxxxxx):")
     return PHONE_STEP
 
 def get_phone(update, ctx):
@@ -37,21 +38,8 @@ def get_phone(update, ctx):
         return PHONE_STEP
 
     ctx.user_data["phone"] = phone
-    api_id = ctx.user_data["api_id"]
-    api_hash = ctx.user_data["api_hash"]
-
-    try:
-        client = TelegramClient(StringSession(), api_id, api_hash)
-        client.connect()
-        ctx.user_data["client"] = client
-
-        # درخواست کد
-        client.send_code_request(phone, force_sms=False)
-        update.message.reply_text("کدی که تلگرام فرستاد را وارد کنید:")
-        return CODE_STEP
-    except Exception as e:
-        update.message.reply_text(f"❌ خطا در ارسال کد: {e}")
-        return ConversationHandler.END
+    update.message.reply_text("کدی که تلگرام فرستاد را وارد کنید:")
+    return CODE_STEP
 
 def get_code(update, ctx):
     ctx.user_data["code"] = update.message.text.strip()
@@ -68,35 +56,21 @@ def get_password(update, ctx):
     api_hash = ctx.user_data["api_hash"]
     phone = ctx.user_data["phone"]
     code = ctx.user_data["code"]
-    client = ctx.user_data.get("client")
 
-    try:
-        if client is None:
-            client = TelegramClient(StringSession(), api_id, api_hash)
-            client.connect()
-
-        client.sign_in(phone=phone, code=code, password=password)
-        session_string = client.session.save()
-        update.message.reply_text(f"✅ Session String شما:\n\n{session_string}")
-    except Exception as e:
-        update.message.reply_text(f"❌ خطا در ورود: {e}")
-    finally:
+    async def do_login():
         try:
-            if client:
-                client.disconnect()
-        except:
-            pass
-        ctx.user_data.clear()
+            client = TelegramClient(StringSession(), api_id, api_hash)
+            await client.start(phone=phone, code=code, password=password)
+            session_string = client.session.save()
+            update.message.reply_text(f"✅ Session String شما:\n\n{session_string}")
+            await client.disconnect()
+        except Exception as e:
+            update.message.reply_text(f"❌ خطا در ورود: {e}")
 
+    asyncio.create_task(do_login())
     return ConversationHandler.END
 
 def cancel(update, ctx):
-    client = ctx.user_data.get("client")
-    try:
-        if client:
-            client.disconnect()
-    except:
-        pass
     ctx.user_data.clear()
     update.message.reply_text("فرایند لغو شد.")
     return ConversationHandler.END
