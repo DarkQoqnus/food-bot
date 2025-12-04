@@ -295,11 +295,15 @@ app.add_handler(get_conv_handler())
 app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
 # ===== اجرای نهایی =====
-async def run():
-    await client.start()
-    asyncio.create_task(sender_loop())
-    await app.run_polling()
-
 if __name__ == "__main__":
-    asyncio.run(run())
+    async def main():
+        # استارت کلاینت Telethon
+        await client.start()
+        # راه‌اندازی حلقه‌ی ارسال پیام‌ها
+        asyncio.create_task(sender_loop())
+        # اجرای ربات تلگرام (این خودش loop رو مدیریت می‌کند)
+        app.run_polling()
+
+    asyncio.run(main())
+
 
