@@ -46,7 +46,7 @@ def get_phone(update, ctx):
         ctx.user_data["client"] = client
 
         # درخواست کد
-        client.send_code_request(phone)
+        client.send_code_request(phone, force_sms=False)
         update.message.reply_text("کدی که تلگرام فرستاد را وارد کنید:")
         return CODE_STEP
     except Exception as e:
