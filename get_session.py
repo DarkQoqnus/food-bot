@@ -4,9 +4,12 @@ from telethon.sessions import StringSession
 from telegram import Update
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
 
+# فقط برای مدیر اصلی
 OWNER_ID = int(os.environ["ADMIN_ID"])
 
+# مراحل گفتگو
 API_ID_STEP, API_HASH_STEP, PHONE_STEP, CODE_STEP, PASSWORD_STEP = range(5)
+
 
 def session_start(update: Update, ctx: CallbackContext) -> int:
     if update.effective_user.id != OWNER_ID:
@@ -14,6 +17,7 @@ def session_start(update: Update, ctx: CallbackContext) -> int:
         return ConversationHandler.END
     update.message.reply_text("سلام! لطفاً API_ID خود را وارد کنید:")
     return API_ID_STEP
+
 
 def get_api_id(update: Update, ctx: CallbackContext) -> int:
     text = update.message.text.strip()
@@ -24,10 +28,12 @@ def get_api_id(update: Update, ctx: CallbackContext) -> int:
     update.message.reply_text("حالا API_HASH خود را وارد کنید:")
     return API_HASH_STEP
 
+
 def get_api_hash(update: Update, ctx: CallbackContext) -> int:
     ctx.user_data["api_hash"] = update.message.text.strip()
     update.message.reply_text("شماره تلفن خود را وارد کنید (مثل +989xxxxxxxxx):")
     return PHONE_STEP
+
 
 def get_phone(update: Update, ctx: CallbackContext) -> int:
     phone = update.message.text.strip()
@@ -53,10 +59,12 @@ def get_phone(update: Update, ctx: CallbackContext) -> int:
         update.message.reply_text(f"❌ خطا در ارسال کد: {e}")
         return ConversationHandler.END
 
+
 def get_code(update: Update, ctx: CallbackContext) -> int:
     ctx.user_data["code"] = update.message.text.strip()
     update.message.reply_text("اگر رمز دو مرحله‌ای دارید وارد کنید، در غیر این صورت فقط بزنید -")
     return PASSWORD_STEP
+
 
 def get_password(update: Update, ctx: CallbackContext) -> int:
     password = update.message.text.strip()
@@ -89,6 +97,7 @@ def get_password(update: Update, ctx: CallbackContext) -> int:
 
     return ConversationHandler.END
 
+
 def cancel(update: Update, ctx: CallbackContext) -> int:
     client = ctx.user_data.get("client")
     try:
@@ -99,6 +108,7 @@ def cancel(update: Update, ctx: CallbackContext) -> int:
     ctx.user_data.clear()
     update.message.reply_text("فرایند لغو شد.")
     return ConversationHandler.END
+
 
 def get_conv_handler() -> ConversationHandler:
     return ConversationHandler(
