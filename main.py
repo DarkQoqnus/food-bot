@@ -2,7 +2,10 @@ import os, re, time, asyncio, logging
 from collections import deque
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telegram.ext import Application, CommandHandler, MessageHandler, ConversationHandler, ContextTypes, filters
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    ConversationHandler, ContextTypes, filters
+)
 from telegram.error import RetryAfter
 
 # ===== LOGGING =====
@@ -19,15 +22,28 @@ ADMIN_ID = int(os.environ["ADMIN_ID"])
 
 # ===== CLASS =====
 class AdminSession:
-    def __init__(self, username, user_id):
+    def __init__(self, username, user_id, api_id=None, api_hash=None, session_string=None):
         self.username = username
         self.user_id = user_id
+        self.api_id = api_id
+        self.api_hash = api_hash
+        self.session_string = session_string
+        self.client = None
         self.active = False
         self.filter_words = []
         self.contacted_sellers = set()
         self.seller_last_dm_at = {}
         self.cooldown_seconds = 180
         self.global_rate_seconds = 5
+
+    async def init_client(self):
+        if self.api_id and self.api_hash and self.session_string:
+            self.client = TelegramClient(
+                StringSession(self.session_string),
+                self.api_id,
+                self.api_hash
+            )
+            await self.client.start()
 
     def toggle(self):
         self.active = not self.active
@@ -51,7 +67,7 @@ admins = set()
 send_queue = deque()
 LAST_SEND_AT = 0
 
-# ===== TELETHON CLIENT =====
+# ===== TELETHON CLIENT اصلی =====
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ===== TELEGRAM BOT =====
@@ -167,114 +183,85 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("فرمت درست: /send @username : پیام")
         return
 
+    session = get_session(update)
+    if not session.client:
+        await update.message.reply_text("❌ کلاینت این ادمین هنوز آماده نیست.")
+        return
+
     async def do_send():
         try:
-            entity = await client.get_entity(uname)
-            await client.send_message(entity.id, msg)
+            entity = await session.client.get_entity(uname)
+            await session.client.send_message(entity.id, msg)
             await safe_send(f"✉️ پیام به {uname} فرستاده شد:\n{msg}")
         except Exception as e:
             await safe_send(f"خطا در ارسال به {uname}: {e}")
 
     asyncio.create_task(do_send())
-    await update.message.reply_text(f"در حال ارسال به {uname}...")
+    await update.message.reply_text(f"در حال ارسال به {uname} با اکانت {session.username}...")
 
-async def newadmin(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not ctx.args:
-        await update.message.reply_text("فرمت درست: /newadmin @username")
-        return
-    uname = ctx.args[0].strip()
-    admins.add(uname)
-    await update.message.reply_text(f"✅ {uname} به لیست ادمین‌ها اضافه شد.")
+# ===== NEWADMIN Conversation =====
+USERNAME_STEP, API_ID_STEP, API_HASH_STEP, SESSION_STEP = range(4)
 
-async def removeadmin(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not ctx.args:
-        await update.message.reply_text("فرمت درست: /removeadmin @username")
-        return
-    uname = ctx.args[0].strip()
-    if uname in admins:
-        admins.remove(uname)
-        await update.message.reply_text(f"❌ {uname} از لیست ادمین‌ها حذف شد.")
-    else:
-        await update.message.reply_text(f"{uname} در لیست ادمین‌ها نبود.")
+async def newadmin_start(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ شما دسترسی ندارید.")
+        return ConversationHandler.END
+    await update.message.reply_text("👤 لطفاً یوزرنیم ادمین جدید را وارد کنید (مثل @username):")
+    return USERNAME_STEP
 
-async def list_admins(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not admins:
-        await update.message.reply_text("هیچ ادمینی ثبت نشده.")
-        return
-    text = "👥 لیست ادمین‌ها:\n"
-    for i, uname in enumerate(admins, start=1):
-        text += f"{i} - {uname}\n"
-    await update.message.reply_text(text)
+async def get_username(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    ctx.user_data["username"] = update.message.text.strip()
+    await update.message.reply_text("🔑 لطفاً API_ID را وارد کنید:")
+    return API_ID_STEP
 
-# ===== هندلر برای کامندهای ناشناخته =====
-async def unknown(update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ کامند مورد نظر یافت نشد!!!")
-
-# ===== SENDER LOOP =====
-async def sender_loop():
-    global LAST_SEND_AT
-    while True:
-        if send_queue:
-            user_id, text, session = send_queue.popleft()
-            wait = max(0, session.global_rate_seconds - (time.time() - LAST_SEND_AT))
-            if wait:
-                await asyncio.sleep(wait)
-            try:
-                await client.send_message(user_id, text)
-                LAST_SEND_AT = time.time()
-            except Exception as e:
-                logging.error(f"DM error: {e}")
-        else:
-            await asyncio.sleep(0.5)
-
-# ===== TELETHON EVENTS =====
-@client.on(events.NewMessage(chats=GROUP_ID))
-async def group_listener(event):
-    for session in admin_sessions.values():
-        if not session.active:
-            continue
-        text = event.message.message or ""
-        if not text:
-            continue
-        sender_id = event.sender_id
-        if sender_id == ADMIN_ID:
-            continue
-        try:
-            sender = await event.get_sender()
-            if getattr(sender, "bot", False):
-                return
-        except Exception:
-            return
-        if match_sale(text, session.filter_words) and can_dm_seller(session, sender_id):
-            send_queue.append((sender_id, "من می‌خرم ✅", session))
-            session.contacted_sellers.add(sender_id)
-            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}")
-
-@client.on(events.NewMessage())
-async def private_replies(event):
-    if not event.is_private:
-        return
-    user_id = event.sender_id
-    if user_id == ADMIN_ID:
-        return
+async def get_api_id(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        sender = await event.get_sender()
-        if getattr(sender, "bot", False):
-            return
-    except Exception:
-        return
-    for session in admin_sessions.values():
-        if user_id in session.contacted_sellers:
-            msg = event.message.message or ""
-            if msg:
-                await asyncio.sleep(1)
-                seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-                await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
+        ctx.user_data["api_id"] = int(update.message.text.strip())
+    except ValueError:
+        await update.message.reply_text("❌ لطفاً عدد معتبر وارد کنید برای API_ID:")
+        return API_ID_STEP
+    await update.message.reply_text("🔑 لطفاً API_HASH را وارد کنید:")
+    return API_HASH_STEP
 
+async def get_api_hash(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    ctx.user_data["api_hash"] = update.message.text.strip()
+    await update.message.reply_text("📜 لطفاً Session String را وارد کنید:")
+    return SESSION_STEP
+
+async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    uname = ctx.user_data["username"]
+    api_id = ctx.user_data["api_id"]
+    api_hash = ctx.user_data["api_hash"]
+    session_string = update.message.text.strip()
+
+    # ساخت AdminSession جدید
+    new_session = AdminSession(uname, update.effective_user.id, api_id, api_hash, session_string)
+    await new_session.init_client()
+
+    admin_sessions[update.effective_user.id] = new_session
+    admins.add(uname)
+
+    await update.message.reply_text(f"✅ ادمین {uname} با کلاینت مستقل اضافه شد.")
+    ctx.user_data.clear()
+    return ConversationHandler.END
+
+async def cancel_newadmin(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    ctx.user_data.clear()
+    await update.message.reply_text("❌ فرایند اضافه کردن ادمین لغو شد.")
+    return ConversationHandler.END
+
+def get_newadmin_handler() -> ConversationHandler:
+    return ConversationHandler(
+        entry_points=[CommandHandler("newadmin", newadmin_start)],
+        states={
+            USERNAME_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_username)],
+            API_ID_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_api_id)],
+            API_HASH_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_api_hash)],
+            SESSION_STEP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_session_string)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_newadmin)],
+    )
+  
 # ===== اضافه کردن همه‌ی هندلرها =====
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("toggle", toggle))
@@ -283,22 +270,22 @@ app.add_handler(CommandHandler("status", status))
 app.add_handler(CommandHandler("send", send))
 app.add_handler(CommandHandler("setcooldown", setcooldown))
 app.add_handler(CommandHandler("setrate", setrate))
-app.add_handler(CommandHandler("newadmin", newadmin))
-app.add_handler(CommandHandler("removeadmin", removeadmin))
-app.add_handler(CommandHandler("admins", list_admins))
+app.add_handler(get_newadmin_handler())
 
-# هندلر ساخت Session String
+# هندلر ساخت Session String (فایل get_session.py)
 from get_session import get_conv_handler
 app.add_handler(get_conv_handler())
 
 # هندلر برای کامندهای ناشناخته
+async def unknown(update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ کامند مورد نظر یافت نشد!!!")
 app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
 # ===== اجرای نهایی =====
+async def run():
+    await client.start()
+    asyncio.create_task(sender_loop())
+    await app.run_polling()
+
 if __name__ == "__main__":
-    client.start()
-    asyncio.get_event_loop().create_task(sender_loop())
-    app.run_polling()
-
-
-
+    asyncio.run(run())
