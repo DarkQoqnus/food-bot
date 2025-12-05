@@ -67,6 +67,13 @@ admins = set()
 send_queue = deque()
 LAST_SEND_AT = 0
 
+# ساخت سشن برای مدیر اصلی
+main_session = AdminSession("@main_admin", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
+asyncio.get_event_loop().run_until_complete(main_session.init_client())
+admin_sessions[ADMIN_ID] = main_session
+admins.add("@main_admin")
+
+
 # ===== SENDER LOOP =====
 async def sender_loop():
     global LAST_SEND_AT
@@ -204,11 +211,7 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
 
-    # اگر مدیر اصلی هست
     if update.effective_user.id == ADMIN_ID:
-        if not admin_sessions:
-            await update.message.reply_text("هیچ ادمینی ثبت نشده.")
-            return
         text = "📊 وضعیت همه‌ی ادمین‌ها:\n"
         for session in admin_sessions.values():
             st = session.status()
@@ -223,7 +226,6 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
             )
         await update.message.reply_text(text)
     else:
-        # اگر ادمین جدید هست
         session = get_session(update)
         st = session.status()
         status_text = "روشن ✅" if st["active"] else "خاموش ❌"
@@ -235,7 +237,6 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
             f"تاخیر فروشنده: {st['cooldown']}\n"
             f"تاخیر بین فروشنده‌ها: {st['rate']}"
         )
-
 
 async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
