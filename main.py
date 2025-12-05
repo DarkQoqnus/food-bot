@@ -133,9 +133,12 @@ def normalize_text(t):
 def match_sale(text, filters):
     t = normalize_text(text)
     has_sale = re.search(r'(فروشی|می[\s\u200c]*فروشم)', t)
-    filters_regex = r'(' + '|'.join(map(re.escape, filters)) + r')'
-    has_filter = re.search(filters_regex, t)
-    return bool(has_sale and has_filter)
+
+    # همه‌ی کلمات باید وجود داشته باشن
+    has_all_filters = all(re.search(re.escape(word), t) for word in filters)
+
+    return bool(has_sale and has_all_filters)
+
 
 def can_dm_seller(session, user_id: int) -> bool:
     t = time.time()
@@ -178,14 +181,24 @@ async def toggle(update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"شنود پیام‌های گروه الان {'روشن ✅' if session.active else 'خاموش ❌'} است.")
 
 async def setfilter(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update): return
+    if not is_admin(update): 
+        return
     session = get_session(update)
-    if not session: return
+    if not session: 
+        return
+
     if ctx.args:
-        session.set_filter(ctx.args[0])
-        await update.message.reply_text(f"فیلتر مورد نظر تنظیم شد: {session.filter_words[0]}")
+        arg = ctx.args[0].strip()
+        if arg == "هردو":
+            # حالت ویژه: هر دو فیلتر همزمان
+            session.filter_words = ["سلف", "حافظ"]
+            await update.message.reply_text("فیلتر ویژه فعال شد: سلف + حافظ")
+        else:
+            # حالت عادی: یک کلمه
+            session.filter_words = [arg]
+            await update.message.reply_text(f"فیلتر تنظیم شد: {arg}")
     else:
-        await update.message.reply_text("یک کلمه بده: /setfilter سلف")
+        await update.message.reply_text("یک کلمه بده: /setfilter سلف یا /setfilter هردو")
 
 async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
