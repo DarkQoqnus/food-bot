@@ -113,7 +113,23 @@ app = Application.builder().token(BOT_TOKEN).build()
 
 # ===== HELPERS =====
 def get_session(update):
-    return admin_sessions.get(update.effective_user.id)
+    user_id = update.effective_user.id
+    uname = f"@{update.effective_user.username}" if update.effective_user.username else None
+
+    # اگر قبلاً با user_id ذخیره شده
+    if user_id in admin_sessions:
+        return admin_sessions[user_id]
+
+    # اگر با یوزرنیم ذخیره شده ولی هنوز user_id نداره
+    if uname and uname in admins:
+        for s in admin_sessions.values():
+            if s.username == uname:
+                s.user_id = user_id
+                admin_sessions[user_id] = s
+                return s
+
+    return None
+
 
 def is_admin(update):
     uname = f"@{update.effective_user.username}" if update.effective_user.username else None
