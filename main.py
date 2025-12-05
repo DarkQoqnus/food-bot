@@ -328,8 +328,12 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         if match_sale(text, new_session.filter_words) and can_dm_seller(new_session, event.sender_id):
             send_queue.append((event.sender_id, "من می‌خرم ✅", new_session))
             new_session.contacted_sellers.add(event.sender_id)
-            await safe_send(f"ادمین {new_session.username} به فروشنده پیام داد:\n{text}",
+    
+            seller = await event.get_sender()
+            seller_name = f"@{seller.username}" if seller.username else f"{seller.first_name} ({seller.id})"
+            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
                             target_id=new_session.user_id or ADMIN_ID)
+
 
     @new_session.client.on(events.NewMessage())
     async def private_replies(event):
