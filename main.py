@@ -218,7 +218,7 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not session or not session.client:
         await update.message.reply_text("❌ کلاینت این ادمین هنوز آماده نیست.")
         return
-    aasync def do_send():
+    async def do_send():
         try:
             # گرفتن entity فروشنده یا یوزرنیم هدف
             entity = await session.client.get_entity(uname)
