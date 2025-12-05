@@ -360,17 +360,21 @@ async def main():
     admin_sessions_by_user_id[ADMIN_ID] = owner_session
     admins.add("Owner")
 
-    # استارت همه‌ی کلاینت‌ها (مدیر اصلی + ادمین‌های جدید)
-    for session in list(admin_sessions_by_user_id.values()) + list(admin_sessions_by_username.values()):
-        if session.client:
-            # فقط یک بار start، نه دوباره روی loop جدید
-            pass  # چون init_client خودش start کرده
-
     # اجرای حلقه ارسال
     asyncio.create_task(sender_loop())
 
-    # اجرای بات تلگرام
-    await app.run_polling()
+    # اجرای بات تلگرام به صورت async
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    # نگه داشتن تا وقتی دستی متوقف بشه
+    try:
+        await asyncio.Event().wait()
+    finally:
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
