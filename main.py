@@ -251,17 +251,18 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     api_hash = ctx.user_data["api_hash"]
     session_string = update.message.text.strip()
 
-    # ساخت سشن جدید برای ادمین
+    # ساخت سشن جدید
     new_session = AdminSession(uname, update.effective_user.id, api_id, api_hash, session_string)
     await new_session.init_client()
 
-    # ذخیره در لیست سشن‌ها
+    # ذخیره با کلید user_id
     admin_sessions[update.effective_user.id] = new_session
     admins.add(uname)
 
     await update.message.reply_text(f"✅ ادمین {uname} اضافه شد و شنود فعال شد.")
     ctx.user_data.clear()
     return ConversationHandler.END
+
 
 async def cancel_newadmin(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ctx.user_data.clear()
