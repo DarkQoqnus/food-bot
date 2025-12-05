@@ -354,11 +354,9 @@ app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
 # ===== اجرای نهایی =====
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-
     # ساخت سشن مدیر اصلی
     owner_session = AdminSession("Owner", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
-    loop.run_until_complete(owner_session.init_client())
+    asyncio.run(owner_session.init_client())
     admin_sessions_by_user_id[ADMIN_ID] = owner_session
     admins.add("Owner")
 
@@ -374,4 +372,5 @@ if __name__ == "__main__":
         # اجرای بات تلگرام
         await app.run_polling()
 
-    loop.run_until_complete(main())
+    asyncio.run(main())
+
