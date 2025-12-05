@@ -105,12 +105,13 @@ def is_admin(update):
         update.effective_user.id == ADMIN_ID or (uname and uname in admins)
     )
 
-async def safe_send(text):
+async def safe_send(text, target_id=None):
     try:
-        await app.bot.send_message(chat_id=ADMIN_ID, text=text)
+        chat_id = target_id if target_id else ADMIN_ID
+        await app.bot.send_message(chat_id=chat_id, text=text)
     except RetryAfter as e:
         await asyncio.sleep(e.retry_after)
-        await app.bot.send_message(chat_id=ADMIN_ID, text=text)
+        await app.bot.send_message(chat_id=chat_id, text=text)
     except Exception as e:
         logging.error(f"Report error: {e}")
 
@@ -134,48 +135,24 @@ def can_dm_seller(session, user_id: int) -> bool:
 
 # ===== TELETHON EVENTS =====
 @client.on(events.NewMessage(chats=GROUP_ID))
+@new_session.client.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
-    for session in admin_sessions.values():
-        if not session.active:
-            continue
-        text = event.message.message or ""
-        if not text:
-            continue
-        sender_id = event.sender_id
-        if sender_id == ADMIN_ID:
-            continue
-        try:
-            sender = await event.get_sender()
-            if getattr(sender, "bot", False):
-                return
-        except Exception:
-            return
-        if match_sale(text, session.filter_words) and can_dm_seller(session, sender_id):
-            send_queue.append((sender_id, "من می‌خرم ✅", session))
-            session.contacted_sellers.add(sender_id)
-            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}")
+    if not new_session.active:
+        return
+    text = event.message.message or ""
+    if match_sale(text, new_session.filter_words) and can_dm_seller(new_session, event.sender_id):
+        send_queue.append((event.sender_id, "من می‌خرم ✅", new_session))
+        new_session.contacted_sellers.add(event.sender_id)
+        seller_name = f"@{event.sender.username}" if event.sender.username else f"{event.sender.first_name} ({event.sender.id})"
+        await safe_send(f"ادمین {new_session.username} به فروشنده پیام داد:\n{text}", target_id=new_session.user_id)
 
-@client.on(events.NewMessage())
+@new_session.client.on(events.NewMessage())
 async def private_replies(event):
-    if not event.is_private:
-        return
-    user_id = event.sender_id
-    if user_id == ADMIN_ID:
-        return
-    try:
-        sender = await event.get_sender()
-        if getattr(sender, "bot", False):
-            return
-    except Exception:
-        return
-    for session in admin_sessions.values():
-        if user_id in session.contacted_sellers:
-            msg = event.message.message or ""
-            if msg:
-                await asyncio.sleep(1)
-                seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-                await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
+    if event.is_private and event.sender_id in new_session.contacted_sellers:
+        msg = event.message.message or ""
+        if msg:
+            seller_name = f"@{event.sender.username}" if event.sender.username else f"{event.sender.first_name} ({event.sender.id})"
+            await safe_send(f"📩 جواب برای {new_session.username} از {seller_name}:\n{msg}", target_id=new_session.user_id)
 
 # ===== COMMANDS =====
 async def start(update, ctx: ContextTypes.DEFAULT_TYPE):
