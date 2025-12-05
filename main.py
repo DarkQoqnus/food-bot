@@ -272,7 +272,7 @@ async def list_admins(update, ctx: ContextTypes.DEFAULT_TYPE):
     names = "\n".join(sorted(admins))
     await update.message.reply_text(f"👥 ادمین‌ها:\n{names}")
 
-async def remove_admin(update, ctx: ContextTypes.DEFAULT_TYPE):
+async def removeadmin(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): 
         return
     if not ctx.args:
