@@ -67,6 +67,25 @@ admins = set()
 send_queue = deque()
 LAST_SEND_AT = 0
 
+# ===== SENDER LOOP =====
+async def sender_loop():
+    global LAST_SEND_AT
+    while True:
+        if send_queue:
+            user_id, text, session = send_queue.popleft()
+            wait = max(0, session.global_rate_seconds - (time.time() - LAST_SEND_AT))
+            if wait:
+                await asyncio.sleep(wait)
+            try:
+                if session.client:
+                    await session.client.send_message(user_id, text)
+                    LAST_SEND_AT = time.time()
+            except Exception as e:
+                logging.error(f"DM error: {e}")
+        else:
+            await asyncio.sleep(0.5)
+
+
 # ===== TELETHON CLIENT اصلی =====
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
