@@ -201,18 +201,41 @@ async def setfilter(update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("یک کلمه بده: /setfilter سلف")
 
 async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update): return
-    session = get_session(update)
-    st = session.status()
-    status_text = "روشن ✅" if st["active"] else "خاموش ❌"
-    await update.message.reply_text(
-        f"📊 وضعیت ربات ({session.username}):\n"
-        f"شنود: {status_text}\n"
-        f"فیلتر مورد نظر: {st['filter']}\n"
-        f"فروشنده‌های اخیر: {st['contacted_count']}\n"
-        f"تاخیر برای فروشنده = {st['cooldown']}\n"
-        f"تاخیر برای فروشنده های مختلف = {st['rate']}"
-    )
+    if not is_admin(update):
+        return
+
+    # اگر مدیر اصلی هست
+    if update.effective_user.id == ADMIN_ID:
+        if not admin_sessions:
+            await update.message.reply_text("هیچ ادمینی ثبت نشده.")
+            return
+        text = "📊 وضعیت همه‌ی ادمین‌ها:\n"
+        for session in admin_sessions.values():
+            st = session.status()
+            status_text = "روشن ✅" if st["active"] else "خاموش ❌"
+            text += (
+                f"\n👤 {session.username}\n"
+                f"شنود: {status_text}\n"
+                f"فیلتر: {st['filter']}\n"
+                f"فروشنده‌های اخیر: {st['contacted_count']}\n"
+                f"تاخیر فروشنده: {st['cooldown']}\n"
+                f"تاخیر بین فروشنده‌ها: {st['rate']}\n"
+            )
+        await update.message.reply_text(text)
+    else:
+        # اگر ادمین جدید هست
+        session = get_session(update)
+        st = session.status()
+        status_text = "روشن ✅" if st["active"] else "خاموش ❌"
+        await update.message.reply_text(
+            f"📊 وضعیت ربات ({session.username}):\n"
+            f"شنود: {status_text}\n"
+            f"فیلتر: {st['filter']}\n"
+            f"فروشنده‌های اخیر: {st['contacted_count']}\n"
+            f"تاخیر فروشنده: {st['cooldown']}\n"
+            f"تاخیر بین فروشنده‌ها: {st['rate']}"
+        )
+
 
 async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
