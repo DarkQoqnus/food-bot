@@ -261,27 +261,52 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(do_send())
     await update.message.reply_text(f"در حال ارسال به {uname} با اکانت {session.username}...")
 
-    async def removeadmin(update, ctx: ContextTypes.DEFAULT_TYPE):
-        if update.effective_user.id != ADMIN_ID: return
-        if not ctx.args:
-            await update.message.reply_text("فرمت درست: /removeadmin @username")
-            return
-        uname = ctx.args[0].strip()
-        if uname in admins:
-            admins.remove(uname)
-            await update.message.reply_text(f"❌ {uname} از لیست ادمین‌ها حذف شد.")
-        else:
-            await update.message.reply_text(f"{uname} در لیست ادمین‌ها نبود.")
-    
-    async def list_admins(update, ctx: ContextTypes.DEFAULT_TYPE):
-        if update.effective_user.id != ADMIN_ID: return
-        if not admins:
-            await update.message.reply_text("هیچ ادمینی ثبت نشده.")
-            return
-        text = "👥 لیست ادمین‌ها:\n"
-        for i, uname in enumerate(admins, start=1):
-            text += f"{i} - {uname}\n"
-        await update.message.reply_text(text)
+# ===== ADMINS MANAGEMENT =====
+async def list_admins(update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update): 
+        return
+    if not admins:
+        await update.message.reply_text("لیست ادمین‌ها خالی است.")
+        return
+    # فقط یوزرنیم‌ها
+    names = "\n".join(sorted(admins))
+    await update.message.reply_text(f"👥 ادمین‌ها:\n{names}")
+
+async def remove_admin(update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update): 
+        return
+    if not ctx.args:
+        await update.message.reply_text("فرمت درست: /removeadmin @username")
+        return
+
+    uname = ctx.args[0].strip()
+    if not uname.startswith("@"):
+        await update.message.reply_text("لطفاً یوزرنیم را با @ وارد کنید (مثلاً @amir).")
+        return
+
+    if uname not in admins:
+        await update.message.reply_text("❌ همچین ادمینی در لیست نیست.")
+        return
+
+    # حذف از مجموعه‌ی admins
+    admins.discard(uname)
+
+    # پیدا کردن و پاک کردن سشن‌های متعلق به این یوزرنیم
+    to_delete = []
+    for uid, session in admin_sessions.items():
+        if session.username == uname:
+            try:
+                if session.client:
+                    await session.client.disconnect()
+            except Exception:
+                pass
+            to_delete.append(uid)
+
+    for uid in to_delete:
+        del admin_sessions[uid]
+
+    await update.message.reply_text(f"✅ ادمین {uname} حذف شد و کلاینتش بسته شد.")
+
     
 # ===== NEWADMIN Conversation =====
 USERNAME_STEP, API_ID_STEP, API_HASH_STEP, SESSION_STEP = range(4)
