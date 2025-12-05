@@ -68,6 +68,9 @@ admins = set()
 send_queue = deque()
 LAST_SEND_AT = 0
 
+# مالکیت فروشنده‌ها: seller_id -> AdminSession
+seller_claims = {}
+
 # ساخت سشن برای مدیر اصلی
 main_session = AdminSession("Owner", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
 asyncio.get_event_loop().run_until_complete(main_session.init_client())
@@ -165,47 +168,75 @@ app = Application.builder().token(BOT_TOKEN).build()
 # ===== TELETHON EVENTS =====
 @client.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener_main(event):
-    for session in iter_sessions():
-        if not session.active:
-            continue
-        text = event.message.message or ""
-        if not text:
-            continue
-        sender_id = event.sender_id
-        if sender_id == ADMIN_ID:
-            continue
-        try:
-            sender = await event.get_sender()
-            if getattr(sender, "bot", False):
-                return
-        except Exception:
-            return
-        if match_sale(text, session.filter_words) and can_dm_seller(session, sender_id):
-            send_queue.append((sender_id, "من می‌خرم ✅", session))
-            session.contacted_sellers.add(sender_id)
-            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
-                            target_id=session.user_id or ADMIN_ID)
-
-@client.on(events.NewMessage())
-async def private_replies_main(event):
-    if not event.is_private:
+    text = event.message.message or ""
+    if not text:
         return
-    user_id = event.sender_id
+
     try:
         sender = await event.get_sender()
         if getattr(sender, "bot", False):
             return
     except Exception:
         return
-    for session in iter_sessions():
-        if user_id in session.contacted_sellers:
-            msg = event.message.message or ""
-            if msg:
-                await asyncio.sleep(1)
-                seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-                await safe_send(f"📩 جواب از {seller_name}:\n{msg}", target_id=session.user_id or ADMIN_ID)
 
+    seller_id = event.sender_id
+
+    # اگر فروشنده قبلاً به یک سشن نسبت داده شده، فقط همان سشن پردازش کند
+    claimed_session = seller_claims.get(seller_id)
+    if claimed_session:
+        if claimed_session.active and match_sale(text, claimed_session.filter_words) and can_dm_seller(claimed_session, seller_id):
+            send_queue.append((seller_id, "من می‌خرم ✅", claimed_session))
+            claimed_session.contacted_sellers.add(seller_id)
+            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+            await safe_send(
+                f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
+                target_id=claimed_session.user_id or ADMIN_ID
+            )
+        return
+
+    # هنوز مالک ندارد: اولین سشن واجد شرایط مالک شود
+    for session in iter_sessions():
+        if not session.active:
+            continue
+        if not match_sale(text, session.filter_words):
+            continue
+        if not can_dm_seller(session, seller_id):
+            continue
+
+        seller_claims[seller_id] = session
+        send_queue.append((seller_id, "من می‌خرم ✅", session))
+        session.contacted_sellers.add(seller_id)
+
+        seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+        await safe_send(
+            f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
+            target_id=session.user_id or ADMIN_ID
+        )
+        break
+
+@client.on(events.NewMessage())
+async def private_replies_main(event):
+    if not event.is_private:
+        return
+
+    try:
+        sender = await event.get_sender()
+        if getattr(sender, "bot", False):
+            return
+    except Exception:
+        return
+
+    seller_id = event.sender_id
+    claimed_session = seller_claims.get(seller_id)
+
+    if claimed_session:
+        msg = event.message.message or ""
+        if msg:
+            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+            await safe_send(
+                f"📩 جواب از {seller_name}:\n{msg}",
+                target_id=claimed_session.user_id or ADMIN_ID
+            )
 
 # ===== COMMANDS =====
 async def start(update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -230,14 +261,10 @@ async def setfilter(update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("یک کلمه بده: /setfilter سلف")
 
 async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update):
-        return
-
-    # فقط وضعیت همون ادمینی که دستور رو زده
+    if not is_admin(update): return
     session = get_session(update)
     st = session.status()
     status_text = "روشن ✅" if st["active"] else "خاموش ❌"
-
     await update.message.reply_text(
         f"📊 وضعیت ربات ({session.username}):\n"
         f"شنود: {status_text}\n"
@@ -248,13 +275,10 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update):
-        return
-
+    if not is_admin(update): return
     if not ctx.args:
         await update.message.reply_text("فرمت درست: /send @username : پیام")
         return
-
     full_text = " ".join(ctx.args)
     try:
         uname, msg = full_text.split(":", 1)
@@ -262,12 +286,10 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("فرمت درست: /send @username : پیام")
         return
-
     session = get_session(update)
     if not session.client:
         await update.message.reply_text("❌ کلاینت این ادمین هنوز آماده نیست.")
         return
-
     async def do_send():
         try:
             entity = await session.client.get_entity(uname)
@@ -275,7 +297,6 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
             await safe_send(f"✉️ پیام به {uname} فرستاده شد:\n{msg}", target_id=session.user_id)
         except Exception as e:
             await safe_send(f"خطا در ارسال به {uname}: {e}", target_id=session.user_id)
-
     asyncio.create_task(do_send())
     await update.message.reply_text(f"در حال ارسال به {uname} با اکانت {session.username}...")
 
@@ -313,18 +334,13 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     api_id = ctx.user_data["api_id"]
     api_hash = ctx.user_data["api_hash"]
     session_string = update.message.text.strip()
-
     new_session = AdminSession(uname, user_id=None, api_id=api_id, api_hash=api_hash, session_string=session_string)
     await new_session.init_client()
-
-    # فقط ذخیره‌سازی
     admin_sessions_by_username[uname] = new_session
     admins.add(uname)
-
     await update.message.reply_text(f"✅ ادمین {uname} با کلاینت مستقل اضافه شد و شنود فعال شد.")
     ctx.user_data.clear()
     return ConversationHandler.END
-
 
 async def cancel_newadmin(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ctx.user_data.clear()
@@ -361,15 +377,12 @@ async def remove_admin(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
         await update.message.reply_text("فرمت درست: /removeadmin @username")
         return
-
     uname = ctx.args[0].strip()
     if uname not in admins or uname not in admin_sessions_by_username:
         await update.message.reply_text("❌ همچین ادمینی در لیست نیست.")
         return
-
     session = admin_sessions_by_username.pop(uname, None)
     admins.discard(uname)
-
     if session:
         try:
             if session.client:
@@ -379,7 +392,10 @@ async def remove_admin(update, ctx: ContextTypes.DEFAULT_TYPE):
         to_delete = [uid for uid, s in admin_sessions_by_user_id.items() if s is session]
         for uid in to_delete:
             del admin_sessions_by_user_id[uid]
-
+        # پاک‌سازی مالکیت فروشنده‌ها
+        to_unclaim = [sid for sid, s in seller_claims.items() if s is session]
+        for sid in to_unclaim:
+            seller_claims.pop(sid, None)
     await update.message.reply_text(f"✅ ادمین {uname} حذف شد و کلاینتش بسته شد.")
 
 # ===== اضافه کردن همه‌ی هندلرها =====
