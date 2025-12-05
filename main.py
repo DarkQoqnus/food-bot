@@ -344,10 +344,11 @@ async def unknown(update, ctx: ContextTypes.DEFAULT_TYPE):
 app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
 # ===== اجرای نهایی =====
-async def run():
-    await client.start()
-    asyncio.create_task(sender_loop())
-    await app.run_polling()
-
 if __name__ == "__main__":
-    asyncio.run(run())
+    # استارت Telethon
+    client.start()
+    # راه‌اندازی حلقه‌ی ارسال پیام‌ها
+    asyncio.get_event_loop().create_task(sender_loop())
+    # اجرای ربات تلگرام (خودش loop رو مدیریت می‌کند)
+    app.run_polling()
+
