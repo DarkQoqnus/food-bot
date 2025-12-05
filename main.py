@@ -336,21 +336,38 @@ async def get_api_hash(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ctx.user_data["api_hash"] = update.message.text.strip()
     await update.message.reply_text("📜 لطفاً Session String را وارد کنید:")
     return SESSION_STEP
-
+    
 async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     uname = ctx.user_data["username"]
     api_id = ctx.user_data["api_id"]
     api_hash = ctx.user_data["api_hash"]
     session_string = update.message.text.strip()
 
-    # ساخت AdminSession جدید
     new_session = AdminSession(uname, update.effective_user.id, api_id, api_hash, session_string)
     await new_session.init_client()
+
+    # ثبت لیسنر روی کلاینت جدید
+    @new_session.client.on(events.NewMessage(chats=GROUP_ID))
+    async def group_listener(event):
+        if not new_session.active:
+            return
+        text = event.message.message or ""
+        if match_sale(text, new_session.filter_words) and can_dm_seller(new_session, event.sender_id):
+            send_queue.append((event.sender_id, "من می‌خرم ✅", new_session))
+            new_session.contacted_sellers.add(event.sender_id)
+            await safe_send(f"ادمین {uname} به فروشنده پیام داد.")
+
+    @new_session.client.on(events.NewMessage())
+    async def private_replies(event):
+        if event.is_private and event.sender_id in new_session.contacted_sellers:
+            msg = event.message.message or ""
+            if msg:
+                await safe_send(f"📩 جواب برای {uname}: {msg}")
 
     admin_sessions[update.effective_user.id] = new_session
     admins.add(uname)
 
-    await update.message.reply_text(f"✅ ادمین {uname} با کلاینت مستقل اضافه شد.")
+    await update.message.reply_text(f"✅ ادمین {uname} با کلاینت مستقل اضافه شد و شنود فعال شد.")
     ctx.user_data.clear()
     return ConversationHandler.END
 
