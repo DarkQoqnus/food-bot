@@ -317,36 +317,14 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     new_session = AdminSession(uname, user_id=None, api_id=api_id, api_hash=api_hash, session_string=session_string)
     await new_session.init_client()
 
-    # لیسنرهای مخصوص این ادمین
-    @new_session.client.on(events.NewMessage(chats=GROUP_ID))
-    async def group_listener(event):
-        if not new_session.active:
-            return
-        text = event.message.message or ""
-        if match_sale(text, new_session.filter_words) and can_dm_seller(new_session, event.sender_id):
-            send_queue.append((event.sender_id, "من می‌خرم ✅", new_session))
-            new_session.contacted_sellers.add(event.sender_id)
-    
-            seller = await event.get_sender()
-            seller_name = f"@{seller.username}" if seller.username else f"{seller.first_name} ({seller.id})"
-            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
-                            target_id=new_session.user_id or ADMIN_ID)
-
-    @new_session.client.on(events.NewMessage())
-    async def private_replies(event):
-        if event.is_private and event.sender_id in new_session.contacted_sellers:
-            msg = event.message.message or ""
-            if msg:
-                seller = await event.get_sender()
-                seller_name = f"@{seller.username}" if seller.username else f"{seller.first_name} ({seller.id})"
-                await safe_send(f"📩 جواب از {seller_name}:\n{msg}", target_id=new_session.user_id or ADMIN_ID)
-
+    # فقط ذخیره‌سازی
     admin_sessions_by_username[uname] = new_session
     admins.add(uname)
 
     await update.message.reply_text(f"✅ ادمین {uname} با کلاینت مستقل اضافه شد و شنود فعال شد.")
     ctx.user_data.clear()
     return ConversationHandler.END
+
 
 async def cancel_newadmin(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ctx.user_data.clear()
