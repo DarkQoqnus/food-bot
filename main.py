@@ -261,6 +261,28 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(do_send())
     await update.message.reply_text(f"در حال ارسال به {uname} با اکانت {session.username}...")
 
+    async def removeadmin(update, ctx: ContextTypes.DEFAULT_TYPE):
+        if update.effective_user.id != ADMIN_ID: return
+        if not ctx.args:
+            await update.message.reply_text("فرمت درست: /removeadmin @username")
+            return
+        uname = ctx.args[0].strip()
+        if uname in admins:
+            admins.remove(uname)
+            await update.message.reply_text(f"❌ {uname} از لیست ادمین‌ها حذف شد.")
+        else:
+            await update.message.reply_text(f"{uname} در لیست ادمین‌ها نبود.")
+    
+    async def list_admins(update, ctx: ContextTypes.DEFAULT_TYPE):
+        if update.effective_user.id != ADMIN_ID: return
+        if not admins:
+            await update.message.reply_text("هیچ ادمینی ثبت نشده.")
+            return
+        text = "👥 لیست ادمین‌ها:\n"
+        for i, uname in enumerate(admins, start=1):
+            text += f"{i} - {uname}\n"
+        await update.message.reply_text(text)
+    
 # ===== NEWADMIN Conversation =====
 USERNAME_STEP, API_ID_STEP, API_HASH_STEP, SESSION_STEP = range(4)
 
@@ -332,7 +354,9 @@ app.add_handler(CommandHandler("status", status))
 app.add_handler(CommandHandler("send", send))
 app.add_handler(CommandHandler("setcooldown", setcooldown))
 app.add_handler(CommandHandler("setrate", setrate))
+app.add_handler(CommandHandler("admins", list_admins))
 app.add_handler(get_newadmin_handler())
+app.add_handler(CommandHandler("removeadmin", removeadmin))
 
 # هندلر ساخت Session String (فایل get_session.py)
 from get_session import get_conv_handler
