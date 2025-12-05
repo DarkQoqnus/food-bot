@@ -211,32 +211,19 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
 
-    if update.effective_user.id == ADMIN_ID:
-        text = "📊 وضعیت همه‌ی ادمین‌ها:\n"
-        for session in admin_sessions.values():
-            st = session.status()
-            status_text = "روشن ✅" if st["active"] else "خاموش ❌"
-            text += (
-                f"\n👤 {session.username}\n"
-                f"شنود: {status_text}\n"
-                f"فیلتر: {st['filter']}\n"
-                f"فروشنده‌های اخیر: {st['contacted_count']}\n"
-                f"تاخیر فروشنده: {st['cooldown']}\n"
-                f"تاخیر بین فروشنده‌ها: {st['rate']}\n"
-            )
-        await update.message.reply_text(text)
-    else:
-        session = get_session(update)
-        st = session.status()
-        status_text = "روشن ✅" if st["active"] else "خاموش ❌"
-        await update.message.reply_text(
-            f"📊 وضعیت ربات ({session.username}):\n"
-            f"شنود: {status_text}\n"
-            f"فیلتر: {st['filter']}\n"
-            f"فروشنده‌های اخیر: {st['contacted_count']}\n"
-            f"تاخیر فروشنده: {st['cooldown']}\n"
-            f"تاخیر بین فروشنده‌ها: {st['rate']}"
-        )
+    # گرفتن سشن مربوط به همین کاربر
+    session = get_session(update)
+    st = session.status()
+    status_text = "روشن ✅" if st["active"] else "خاموش ❌"
+
+    await update.message.reply_text(
+        f"📊 وضعیت ربات ({session.username}):\n"
+        f"شنود: {status_text}\n"
+        f"فیلتر: {st['filter']}\n"
+        f"فروشنده‌های اخیر: {st['contacted_count']}\n"
+        f"تاخیر فروشنده: {st['cooldown']}\n"
+        f"تاخیر بین فروشنده‌ها: {st['rate']}"
+    )
 
 async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
