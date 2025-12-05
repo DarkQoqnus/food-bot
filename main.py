@@ -187,6 +187,39 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
         f"تاخیر بین فروشنده‌ها: {st['rate']}"
     )
 
+async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        return
+
+    if not ctx.args:
+        await update.message.reply_text("فرمت درست: /send @username : پیام")
+        return
+
+    full_text = " ".join(ctx.args)
+    try:
+        uname, msg = full_text.split(":", 1)
+        uname, msg = uname.strip(), msg.strip()
+    except ValueError:
+        await update.message.reply_text("فرمت درست: /send @username : پیام")
+        return
+
+    session = get_session(update)
+    if not session or not session.client:
+        await update.message.reply_text("❌ کلاینت این ادمین هنوز آماده نیست.")
+        return
+
+    async def do_send():
+        try:
+            entity = await session.client.get_entity(uname)
+            await session.client.send_message(entity.id, msg)
+            await safe_send(f"✉️ پیام به {uname} فرستاده شد:\n{msg}", target_id=session.user_id)
+        except Exception as e:
+            await safe_send(f"خطا در ارسال به {uname}: {e}", target_id=session.user_id)
+
+    asyncio.create_task(do_send())
+    await update.message.reply_text(f"در حال ارسال به {uname} با اکانت {session.username}...")
+
+
 # ===== NEWADMIN Conversation =====
 USERNAME_STEP, API_ID_STEP, API_HASH_STEP, SESSION_STEP = range(4)
 
