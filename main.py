@@ -22,7 +22,7 @@ ADMIN_ID = int(os.environ["ADMIN_ID"])
 
 # ===== CLASS =====
 class AdminSession:
-    def __init__(self, username, user_id, api_id=None, api_hash=None, session_string=None):
+    def __init__(self, username, user_id=None, api_id=None, api_hash=None, session_string=None):
         self.username = username
         self.user_id = user_id
         self.api_id = api_id
@@ -62,7 +62,8 @@ class AdminSession:
         }
 
 # ===== STATE =====
-admin_sessions = {}
+admin_sessions_by_user_id = {}
+admin_sessions_by_username = {}
 admins = set()
 send_queue = deque()
 LAST_SEND_AT = 0
@@ -70,41 +71,38 @@ LAST_SEND_AT = 0
 # ساخت سشن برای مدیر اصلی
 main_session = AdminSession("Owner", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
 asyncio.get_event_loop().run_until_complete(main_session.init_client())
-admin_sessions[ADMIN_ID] = main_session
+admin_sessions_by_user_id[ADMIN_ID] = main_session
 admins.add("Owner")
-
-
-# ===== SENDER LOOP =====
-async def sender_loop():
-    global LAST_SEND_AT
-    while True:
-        if send_queue:
-            user_id, text, session = send_queue.popleft()
-            wait = max(0, session.global_rate_seconds - (time.time() - LAST_SEND_AT))
-            if wait:
-                await asyncio.sleep(wait)
-            try:
-                if session.client:
-                    await session.client.send_message(user_id, text)
-                    LAST_SEND_AT = time.time()
-            except Exception as e:
-                logging.error(f"DM error: {e}")
-        else:
-            await asyncio.sleep(0.5)
-
-# ===== TELETHON CLIENT اصلی =====
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-
-# ===== TELEGRAM BOT =====
-app = Application.builder().token(BOT_TOKEN).build()
 
 # ===== HELPERS =====
 def get_session(update):
     user_id = update.effective_user.id
     uname = f"@{update.effective_user.username}" if update.effective_user.username else f"user_{user_id}"
-    if user_id not in admin_sessions:
-        admin_sessions[user_id] = AdminSession(uname, user_id)
-    return admin_sessions[user_id]
+
+    if user_id in admin_sessions_by_user_id:
+        return admin_sessions_by_user_id[user_id]
+
+    if uname in admin_sessions_by_username:
+        s = admin_sessions_by_username[uname]
+        if s.user_id is None:
+            s.user_id = user_id
+            admin_sessions_by_user_id[user_id] = s
+        return s
+
+    s = AdminSession(uname, user_id)
+    admin_sessions_by_user_id[user_id] = s
+    return s
+
+def iter_sessions():
+    seen = set()
+    for s in admin_sessions_by_user_id.values():
+        if id(s) not in seen:
+            seen.add(id(s))
+            yield s
+    for s in admin_sessions_by_username.values():
+        if id(s) not in seen:
+            seen.add(id(s))
+            yield s
 
 def is_admin(update):
     uname = f"@{update.effective_user.username}" if update.effective_user.username else None
@@ -140,10 +138,34 @@ def can_dm_seller(session, user_id: int) -> bool:
     last = session.seller_last_dm_at.get(user_id, 0)
     return (t - last) >= session.cooldown_seconds
 
-# ===== TELETHON EVENTS (کلاینت اصلی) =====
+# ===== SENDER LOOP =====
+async def sender_loop():
+    global LAST_SEND_AT
+    while True:
+        if send_queue:
+            user_id, text, session = send_queue.popleft()
+            wait = max(0, session.global_rate_seconds - (time.time() - LAST_SEND_AT))
+            if wait:
+                await asyncio.sleep(wait)
+            try:
+                if session.client:
+                    await session.client.send_message(user_id, text)
+                    LAST_SEND_AT = time.time()
+            except Exception as e:
+                logging.error(f"DM error: {e}")
+        else:
+            await asyncio.sleep(0.5)
+
+# ===== TELETHON CLIENT اصلی =====
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+
+# ===== TELEGRAM BOT =====
+app = Application.builder().token(BOT_TOKEN).build()
+
+# ===== TELETHON EVENTS =====
 @client.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener_main(event):
-    for session in admin_sessions.values():
+    for session in iter_sessions():
         if not session.active:
             continue
         text = event.message.message or ""
@@ -162,7 +184,8 @@ async def group_listener_main(event):
             send_queue.append((sender_id, "من می‌خرم ✅", session))
             session.contacted_sellers.add(sender_id)
             seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}", target_id=session.user_id)
+            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
+                            target_id=session.user_id or ADMIN_ID)
 
 @client.on(events.NewMessage())
 async def private_replies_main(event):
@@ -177,13 +200,14 @@ async def private_replies_main(event):
             return
     except Exception:
         return
-    for session in admin_sessions.values():
+    for session in iter_sessions():
         if user_id in session.contacted_sellers:
             msg = event.message.message or ""
             if msg:
                 await asyncio.sleep(1)
                 seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-                await safe_send(f"📩 جواب از {seller_name}:\n{msg}", target_id=session.user_id)
+                await safe_send(f"📩 جواب از {seller_name}:\n{msg}",
+                                target_id=session.user_id or ADMIN_ID)
 
 # ===== COMMANDS =====
 async def start(update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -211,7 +235,7 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
 
-    # گرفتن سشن مربوط به همین کاربر
+    # فقط وضعیت همون ادمینی که دستور رو زده
     session = get_session(update)
     st = session.status()
     status_text = "روشن ✅" if st["active"] else "خاموش ❌"
@@ -250,21 +274,12 @@ async def send(update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             entity = await session.client.get_entity(uname)
             await session.client.send_message(entity.id, msg)
-            await safe_send(
-                f"✉️ پیام به {uname} فرستاده شد:\n{msg}",
-                target_id=session.user_id
-            )
+            await safe_send(f"✉️ پیام به {uname} فرستاده شد:\n{msg}", target_id=session.user_id)
         except Exception as e:
-            await safe_send(
-                f"خطا در ارسال به {uname}: {e}",
-                target_id=session.user_id
-            )
+            await safe_send(f"خطا در ارسال به {uname}: {e}", target_id=session.user_id)
 
     asyncio.create_task(do_send())
-    await update.message.reply_text(
-        f"در حال ارسال به {uname} با اکانت {session.username}..."
-    )
-
+    await update.message.reply_text(f"در حال ارسال به {uname} با اکانت {session.username}...")
 
 # ===== NEWADMIN Conversation =====
 USERNAME_STEP, API_ID_STEP, API_HASH_STEP, SESSION_STEP = range(4)
@@ -301,10 +316,10 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     api_hash = ctx.user_data["api_hash"]
     session_string = update.message.text.strip()
 
-    new_session = AdminSession(uname, update.effective_user.id, api_id, api_hash, session_string)
+    new_session = AdminSession(uname, user_id=None, api_id=api_id, api_hash=api_hash, session_string=session_string)
     await new_session.init_client()
 
-    # ثبت لیسنر روی کلاینت همین ادمین
+    # لیسنرهای مخصوص این ادمین
     @new_session.client.on(events.NewMessage(chats=GROUP_ID))
     async def group_listener(event):
         if not new_session.active:
@@ -313,16 +328,18 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         if match_sale(text, new_session.filter_words) and can_dm_seller(new_session, event.sender_id):
             send_queue.append((event.sender_id, "من می‌خرم ✅", new_session))
             new_session.contacted_sellers.add(event.sender_id)
-            await safe_send(f"ادمین {new_session.username} به فروشنده پیام داد:\n{text}", target_id=new_session.user_id)
+            await safe_send(f"ادمین {new_session.username} به فروشنده پیام داد:\n{text}",
+                            target_id=new_session.user_id or ADMIN_ID)
 
     @new_session.client.on(events.NewMessage())
     async def private_replies(event):
         if event.is_private and event.sender_id in new_session.contacted_sellers:
             msg = event.message.message or ""
             if msg:
-                await safe_send(f"📩 جواب برای {new_session.username}: {msg}", target_id=new_session.user_id)
+                await safe_send(f"📩 جواب برای {new_session.username}: {msg}",
+                                target_id=new_session.user_id or ADMIN_ID)
 
-    admin_sessions[update.effective_user.id] = new_session
+    admin_sessions_by_username[uname] = new_session
     admins.add(uname)
 
     await update.message.reply_text(f"✅ ادمین {uname} با کلاینت مستقل اضافه شد و شنود فعال شد.")
@@ -366,22 +383,22 @@ async def remove_admin(update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     uname = ctx.args[0].strip()
-    if uname not in admins:
+    if uname not in admins or uname not in admin_sessions_by_username:
         await update.message.reply_text("❌ همچین ادمینی در لیست نیست.")
         return
 
+    session = admin_sessions_by_username.pop(uname, None)
     admins.discard(uname)
-    to_delete = []
-    for uid, session in admin_sessions.items():
-        if session.username == uname:
-            try:
-                if session.client:
-                    await session.client.disconnect()
-            except Exception:
-                pass
-            to_delete.append(uid)
-    for uid in to_delete:
-        del admin_sessions[uid]
+
+    if session:
+        try:
+            if session.client:
+                await session.client.disconnect()
+        except Exception:
+            pass
+        to_delete = [uid for uid, s in admin_sessions_by_user_id.items() if s is session]
+        for uid in to_delete:
+            del admin_sessions_by_user_id[uid]
 
     await update.message.reply_text(f"✅ ادمین {uname} حذف شد و کلاینتش بسته شد.")
 
