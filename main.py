@@ -68,10 +68,10 @@ send_queue = deque()
 LAST_SEND_AT = 0
 
 # ساخت سشن برای مدیر اصلی
-main_session = AdminSession("@main_admin", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
+main_session = AdminSession("Owner", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
 asyncio.get_event_loop().run_until_complete(main_session.init_client())
 admin_sessions[ADMIN_ID] = main_session
-admins.add("@main_admin")
+admins.add("Owner")
 
 
 # ===== SENDER LOOP =====
