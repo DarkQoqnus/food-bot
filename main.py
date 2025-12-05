@@ -353,24 +353,25 @@ async def unknown(update, ctx: ContextTypes.DEFAULT_TYPE):
 app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
 # ===== اجرای نهایی =====
-if __name__ == "__main__":
+async def main():
     # ساخت سشن مدیر اصلی
     owner_session = AdminSession("Owner", ADMIN_ID, API_ID, API_HASH, SESSION_STRING)
-    asyncio.run(owner_session.init_client())
+    await owner_session.init_client()
     admin_sessions_by_user_id[ADMIN_ID] = owner_session
     admins.add("Owner")
 
-    async def main():
-        # استارت همه‌ی کلاینت‌ها
-        for session in list(admin_sessions_by_user_id.values()) + list(admin_sessions_by_username.values()):
-            if session.client:
-                await session.client.start()
+    # استارت همه‌ی کلاینت‌ها (مدیر اصلی + ادمین‌های جدید)
+    for session in list(admin_sessions_by_user_id.values()) + list(admin_sessions_by_username.values()):
+        if session.client:
+            # فقط یک بار start، نه دوباره روی loop جدید
+            pass  # چون init_client خودش start کرده
 
-        # اجرای حلقه ارسال
-        asyncio.create_task(sender_loop())
+    # اجرای حلقه ارسال
+    asyncio.create_task(sender_loop())
 
-        # اجرای بات تلگرام
-        await app.run_polling()
+    # اجرای بات تلگرام
+    await app.run_polling()
 
+if __name__ == "__main__":
     asyncio.run(main())
 
