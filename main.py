@@ -85,7 +85,6 @@ async def sender_loop():
         else:
             await asyncio.sleep(0.5)
 
-
 # ===== TELETHON CLIENT اصلی =====
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -132,6 +131,51 @@ def can_dm_seller(session, user_id: int) -> bool:
     t = time.time()
     last = session.seller_last_dm_at.get(user_id, 0)
     return (t - last) >= session.cooldown_seconds
+
+# ===== TELETHON EVENTS =====
+@client.on(events.NewMessage(chats=GROUP_ID))
+async def group_listener(event):
+    for session in admin_sessions.values():
+        if not session.active:
+            continue
+        text = event.message.message or ""
+        if not text:
+            continue
+        sender_id = event.sender_id
+        if sender_id == ADMIN_ID:
+            continue
+        try:
+            sender = await event.get_sender()
+            if getattr(sender, "bot", False):
+                return
+        except Exception:
+            return
+        if match_sale(text, session.filter_words) and can_dm_seller(session, sender_id):
+            send_queue.append((sender_id, "من می‌خرم ✅", session))
+            session.contacted_sellers.add(sender_id)
+            seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+            await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}")
+
+@client.on(events.NewMessage())
+async def private_replies(event):
+    if not event.is_private:
+        return
+    user_id = event.sender_id
+    if user_id == ADMIN_ID:
+        return
+    try:
+        sender = await event.get_sender()
+        if getattr(sender, "bot", False):
+            return
+    except Exception:
+        return
+    for session in admin_sessions.values():
+        if user_id in session.contacted_sellers:
+            msg = event.message.message or ""
+            if msg:
+                await asyncio.sleep(1)
+                seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
+                await safe_send(f"📩 جواب از {seller_name}:\n{msg}")
 
 # ===== COMMANDS =====
 async def start(update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -184,7 +228,6 @@ async def status(update, ctx: ContextTypes.DEFAULT_TYPE):
         f"📊 وضعیت ربات ({session.username}):\n"
         f"شنود: {status_text}\n"
         f"فیلتر مورد نظر: {st['filter']}\n"
-        f"فروشنده‌های اخیر: {st['contacted_count']}\n"
         f"تاخیر برای فروشنده = {st['cooldown']}\n"
         f"تاخیر برای فروشنده های مختلف = {st['rate']}"
     )
@@ -280,7 +323,7 @@ def get_newadmin_handler() -> ConversationHandler:
         },
         fallbacks=[CommandHandler("cancel", cancel_newadmin)],
     )
-  
+
 # ===== اضافه کردن همه‌ی هندلرها =====
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("toggle", toggle))
