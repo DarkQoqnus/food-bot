@@ -192,8 +192,6 @@ async def private_replies_main(event):
     if not event.is_private:
         return
     user_id = event.sender_id
-    if user_id == ADMIN_ID:
-        return
     try:
         sender = await event.get_sender()
         if getattr(sender, "bot", False):
@@ -206,8 +204,8 @@ async def private_replies_main(event):
             if msg:
                 await asyncio.sleep(1)
                 seller_name = f"@{sender.username}" if sender.username else f"{sender.first_name} ({sender.id})"
-                await safe_send(f"📩 جواب از {seller_name}:\n{msg}",
-                                target_id=session.user_id or ADMIN_ID)
+                await safe_send(f"📩 جواب از {seller_name}:\n{msg}", target_id=session.user_id or ADMIN_ID)
+
 
 # ===== COMMANDS =====
 async def start(update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -334,14 +332,14 @@ async def get_session_string(update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
             await safe_send(f"به فروشنده {seller_name} پیام دادم\n📝 متن آگهی:\n{text}",
                             target_id=new_session.user_id or ADMIN_ID)
 
-
     @new_session.client.on(events.NewMessage())
     async def private_replies(event):
         if event.is_private and event.sender_id in new_session.contacted_sellers:
             msg = event.message.message or ""
             if msg:
-                await safe_send(f"📩 جواب برای {new_session.username}: {msg}",
-                                target_id=new_session.user_id or ADMIN_ID)
+                seller = await event.get_sender()
+                seller_name = f"@{seller.username}" if seller.username else f"{seller.first_name} ({seller.id})"
+                await safe_send(f"📩 جواب از {seller_name}:\n{msg}", target_id=new_session.user_id or ADMIN_ID)
 
     admin_sessions_by_username[uname] = new_session
     admins.add(uname)
